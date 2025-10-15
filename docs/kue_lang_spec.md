@@ -769,26 +769,3 @@ Error: Variable declaration must be at the beginning of file (line 15)
 Error: 'break' statement outside of loop at line 20
 Error: Unexpected token '=' at line 5, column 10
 ```
-
----
-
-## 実装の推奨事項
-
-### フェーズ分割
-
-1. **字句解析 (Lexer)**
-   - トークン化
-   - コメント除去
-
-2. **構文解析 (Parser)**
-   - ASTの構築
-   - 文法チェック
-
-3. **意味解析 (Semantic Analyzer)**
-   - 変数スコープチェック
-   - 型チェック（アドレス範囲など）
-   - マクロ展開
-
-4. **コード生成 (Code Generator)**
-   - ASTからアセンブリコードへの変換
-   - ラベル解決
