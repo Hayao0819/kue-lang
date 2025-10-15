@@ -1,0 +1,3 @@
+// Test ACC = ACC + 1
+ACC = ACC + 1
+halt

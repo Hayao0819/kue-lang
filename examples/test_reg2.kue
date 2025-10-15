@@ -1,0 +1,14 @@
+// Test register.kue step by step
+var counter @ 0x180
+
+counter = 0
+
+loop {
+    ACC = counter
+    ACC = ACC + 1
+    counter = ACC
+
+    break
+}
+
+halt

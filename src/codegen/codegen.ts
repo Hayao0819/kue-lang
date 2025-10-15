@@ -175,20 +175,41 @@ function generateStatement(statement: Statement, context: CodeGenContext): strin
 function generateAssignment(statement: AssignmentStatement, symbolTable: Map<string, number>): string {
   const lines: string[] = [];
 
-  // 特殊ケース: レジスタからレジスタへの直接代入
-  // IX = ACC または ACC = IX
-  if (statement.left.type === "Register" && statement.right.type === "Register") {
-    if (statement.left.name === statement.right.name) {
-      // 同じレジスタ同士の代入は無操作
-      return `* ${statement.left.name} = ${statement.right.name} (no operation)`;
+  // 特殊ケース1: 左辺がACCの場合
+  // ACCへの代入は常にLD命令を使用（ST命令は使えない）
+  if (statement.left.type === "Register" && statement.left.name === "ACC") {
+    // 右辺もACCなら無操作
+    if (statement.right.type === "Register" && statement.right.name === "ACC") {
+      return `* ACC = ACC (no operation)`;
     }
-    // 異なるレジスタ間の代入
-    if (statement.left.name === "ACC" && statement.right.name === "IX") {
-      return `LD ACC, IX`;
-    }
-    if (statement.left.name === "IX" && statement.right.name === "ACC") {
+    // それ以外は、LD ACC, <source>で実現
+    const loadInstr = generateLoad(statement.right, symbolTable);
+    return loadInstr;
+  }
+
+  // 特殊ケース2: 左辺がIXで右辺がレジスタの場合
+  if (statement.left.type === "Register" && statement.left.name === "IX") {
+    if (statement.right.type === "Register") {
+      // IX = IX → 無操作
+      if (statement.right.name === "IX") {
+        return `* IX = IX (no operation)`;
+      }
+      // IX = ACC → LD IX, ACC
       return `LD IX, ACC`;
     }
+    // IX = <non-register> → LD IX, <source>
+    if (statement.right.type === "Literal") {
+      return `LD IX, ${statement.right.value}`;
+    } else if (statement.right.type === "Variable") {
+      const address = getVariableAddress(statement.right.name, symbolTable);
+      return `LD IX, ${formatDataAddress(address)}`;
+    }
+    // IX = array[...] → ACCを経由する必要がある
+    const loadToACC = generateLoad(statement.right, symbolTable);
+    const lines: string[] = [];
+    lines.push(loadToACC);
+    lines.push(`LD IX, ACC`);
+    return lines.join("\n");
   }
 
   // 特殊ケース: 両方が変数添字の配列アクセスの場合
@@ -266,6 +287,8 @@ function generateLoad(rvalue: RValue, symbolTable: Map<string, number>): string 
 
 /**
  * 左辺値のストア命令を生成
+ * NOTE: レジスタへのストアはST命令では不可能（仕様上、STの第2オペランドはメモリアドレスのみ）
+ *       レジスタへの代入は、LD命令または直接演算で行う
  */
 function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string {
   if (lvalue.type === "Variable") {
@@ -276,12 +299,12 @@ function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string
     // 配列アクセス: array[index]
     return generateArrayStore(lvalue, symbolTable);
   } else if (lvalue.type === "Register") {
-    // レジスタ: ST ACC, IX または ST ACC, ACC（無操作）
-    if (lvalue.name === "IX") {
-      return `ST ACC, IX`;
-    }
-    // ACC = ACC は無操作だが、コメントとして出力
-    return `* ACC = ACC (no operation)`;
+    // レジスタへのストアは、ST命令では実現できない
+    // この関数が呼ばれる場合は、プログラミングエラー
+    throw new Error(
+      `Cannot use ST instruction to store to register ${lvalue.name}. ` +
+      `Register operations should be handled by direct register instructions (LD, ADD, etc).`
+    );
   }
   const _exhaustive: never = lvalue;
   return _exhaustive;
@@ -294,10 +317,40 @@ function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string
  *                        ST ACC, (182H)
  * ACC = ACC + 1      →  ADD ACC, 1
  *                        (ロード・ストア不要)
+ * IX = IX + 1        →  ADD IX, 1
+ *                        (ロード・ストア不要、IXレジスタで直接演算)
  */
 function generateBinaryOperation(statement: BinaryOperationStatement, symbolTable: Map<string, number>): string {
   const lines: string[] = [];
 
+  // 特殊ケース: デスティネーションがレジスタの場合、そのレジスタで直接演算
+  if (statement.destination.type === "Register") {
+    const targetReg = statement.destination.name;
+
+    // 左オペランドがデスティネーションと同じレジスタかチェック
+    const leftIsTarget = statement.left.type === "Register" && statement.left.name === targetReg;
+
+    if (!leftIsTarget) {
+      // 左オペランドをターゲットレジスタにロード
+      const loadInstr = generateRegisterLoad(statement.left, targetReg, symbolTable);
+      if (loadInstr && !loadInstr.startsWith("*")) {
+        lines.push(loadInstr);
+      }
+    }
+
+    // ターゲットレジスタで直接演算
+    const opInstr = generateBinaryOperationInstructionForRegister(
+      targetReg,
+      statement.operator,
+      statement.right,
+      symbolTable
+    );
+    lines.push(opInstr);
+
+    return lines.join("\n");
+  }
+
+  // 通常ケース: デスティネーションが変数または配列
   // 左オペランドをアキュムレータにロード
   const loadInstr = generateOperandLoad(statement.left, symbolTable);
   if (loadInstr && !loadInstr.startsWith("*")) {
@@ -315,6 +368,87 @@ function generateBinaryOperation(statement: BinaryOperationStatement, symbolTabl
   }
 
   return lines.join("\n");
+}
+
+/**
+ * レジスタへのロード命令を生成
+ * 特定のレジスタ(ACC or IX)にオペランドをロード
+ */
+function generateRegisterLoad(operand: Operand, targetReg: string, symbolTable: Map<string, number>): string {
+  if (operand.type === "Literal") {
+    return `LD ${targetReg}, ${operand.value}`;
+  } else if (operand.type === "Variable") {
+    const address = getVariableAddress(operand.name, symbolTable);
+    return `LD ${targetReg}, ${formatDataAddress(address)}`;
+  } else if (operand.type === "ArrayAccess") {
+    // 配列アクセスの場合、ACCにロードしてからターゲットレジスタに転送
+    // ただし、ターゲットがACCならそのままロード
+    if (targetReg === "ACC") {
+      return generateArrayLoad(operand, symbolTable);
+    }
+    // IXの場合は、ACCを経由する必要がある（配列アクセスの結果はACCにロードされる）
+    const lines: string[] = [];
+    lines.push(generateArrayLoad(operand, symbolTable));
+    lines.push(`LD ${targetReg}, ACC`);
+    return lines.join("\n");
+  } else if (operand.type === "Register") {
+    if (operand.name === targetReg) {
+      return `* ${targetReg} = ${targetReg} (no operation)`;
+    }
+    return `LD ${targetReg}, ${operand.name}`;
+  }
+  const _exhaustive: never = operand;
+  return _exhaustive;
+}
+
+/**
+ * レジスタに対する二項演算命令を生成
+ * 指定されたレジスタで直接演算を実行
+ */
+function generateBinaryOperationInstructionForRegister(
+  targetReg: string,
+  operator: string,
+  rightOperand: Operand,
+  symbolTable: Map<string, number>,
+): string {
+  // 右オペランドの表現を取得
+  const rightOperandStr = formatOperand(rightOperand, symbolTable);
+
+  // 演算子に応じた命令を生成
+  switch (operator) {
+    // 算術演算
+    case "+":
+      return `ADD ${targetReg}, ${rightOperandStr}`;
+    case "+c":
+      return `ADC ${targetReg}, ${rightOperandStr}`;
+    case "-":
+      return `SUB ${targetReg}, ${rightOperandStr}`;
+    case "-c":
+      return `SBC ${targetReg}, ${rightOperandStr}`;
+    // 論理演算
+    case "&":
+      return `AND ${targetReg}, ${rightOperandStr}`;
+    case "|":
+      return `OR ${targetReg}, ${rightOperandStr}`;
+    case "^":
+      return `EOR ${targetReg}, ${rightOperandStr}`;
+    // シフト演算（オペランドなし、常に1ビットシフト）
+    case "<<":
+      return `SLL ${targetReg}`;
+    case "<<a":
+      return `SLA ${targetReg}`;
+    case ">>":
+      return `SRL ${targetReg}`;
+    case ">>a":
+      return `SRA ${targetReg}`;
+    // ローテート演算（オペランドなし、常に1ビット）
+    case "<<<":
+      return `RLL ${targetReg}`;
+    case ">>>":
+      return `RRL ${targetReg}`;
+    default:
+      throw new Error(`Unknown binary operator: ${operator}`);
+  }
 }
 
 /**

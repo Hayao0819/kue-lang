@@ -1,0 +1,3 @@
+// Simple test for IX = IX + 1
+IX = IX + 1
+halt
