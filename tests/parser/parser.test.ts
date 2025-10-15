@@ -910,4 +910,162 @@ describe("KueParser", () => {
       expect(result.ast?.body).toHaveLength(4); // 2 assignments, 1 loop, 1 halt
     });
   });
+
+  describe("配列アクセス", () => {
+    it("should parse array access with constant index in assignment (right)", () => {
+      const source = `
+        var arr @ 0x180
+        var result @ 0x190
+        result = arr[5]
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("AssignmentStatement");
+      expect((stmt as any).left.type).toBe("Variable");
+      expect((stmt as any).left.name).toBe("result");
+      expect((stmt as any).right.type).toBe("ArrayAccess");
+      expect((stmt as any).right.array).toBe("arr");
+      expect((stmt as any).right.index.type).toBe("Literal");
+      expect((stmt as any).right.index.value).toBe(5);
+    });
+
+    it("should parse array access with variable index in assignment (right)", () => {
+      const source = `
+        var arr @ 0x180
+        var i @ 0x190
+        var result @ 0x191
+        result = arr[i]
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).right.type).toBe("ArrayAccess");
+      expect((stmt as any).right.array).toBe("arr");
+      expect((stmt as any).right.index.type).toBe("Variable");
+      expect((stmt as any).right.index.name).toBe("i");
+    });
+
+    it("should parse array access with constant index in assignment (left)", () => {
+      const source = `
+        var arr @ 0x180
+        var value @ 0x190
+        arr[3] = value
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("AssignmentStatement");
+      expect((stmt as any).left.type).toBe("ArrayAccess");
+      expect((stmt as any).left.array).toBe("arr");
+      expect((stmt as any).left.index.value).toBe(3);
+      expect((stmt as any).right.type).toBe("Variable");
+    });
+
+    it("should parse array access with variable index in assignment (left)", () => {
+      const source = `
+        var arr @ 0x180
+        var i @ 0x190
+        var value @ 0x191
+        arr[i] = value
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).left.type).toBe("ArrayAccess");
+      expect((stmt as any).left.index.type).toBe("Variable");
+      expect((stmt as any).left.index.name).toBe("i");
+    });
+
+    it("should parse array access on both sides of assignment", () => {
+      const source = `
+        var src @ 0x180
+        var dst @ 0x190
+        var i @ 0x1A0
+        var j @ 0x1A1
+        dst[i] = src[j]
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).left.type).toBe("ArrayAccess");
+      expect((stmt as any).left.array).toBe("dst");
+      expect((stmt as any).right.type).toBe("ArrayAccess");
+      expect((stmt as any).right.array).toBe("src");
+    });
+
+    it("should parse array access in binary operation (right operand)", () => {
+      const source = `
+        var arr @ 0x180
+        var result @ 0x190
+        result = arr[2] + 10
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("BinaryOperationStatement");
+      expect((stmt as any).left.type).toBe("ArrayAccess");
+      expect((stmt as any).left.array).toBe("arr");
+      expect((stmt as any).right.value).toBe(10);
+    });
+
+    it("should parse array access in comparison", () => {
+      const source = `
+        var arr @ 0x180
+        var i @ 0x190
+        arr[i] == 0
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("ComparisonStatement");
+      expect((stmt as any).left.type).toBe("ArrayAccess");
+      expect((stmt as any).left.array).toBe("arr");
+    });
+
+    it("should parse array access with hex literal index", () => {
+      const source = `
+        var arr @ 0x180
+        var result @ 0x190
+        result = arr[0x0A]
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).right.index.value).toBe(0x0a);
+    });
+  });
 });

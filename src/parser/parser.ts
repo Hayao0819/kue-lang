@@ -19,6 +19,7 @@ import {
   If,
   Input,
   LBrace,
+  LBracket,
   LeftRotate,
   LeftShift,
   LeftShiftArithmetic,
@@ -43,6 +44,7 @@ import {
   PlusWithCarry,
   Positive,
   RBrace,
+  RBracket,
   ResetCarryFlag,
   RightRotate,
   RightShift,
@@ -65,7 +67,7 @@ export class KueParser extends CstParser {
     super(allTokens, {
       recoveryEnabled: true,
       nodeLocationTracking: "full",
-      maxLookahead: 4, // 二項演算文と代入文を区別するために必要
+      maxLookahead: 8, // 配列アクセスと二項演算文/比較文を区別するために必要
     });
 
     this.performSelfAnalysis();
@@ -108,57 +110,115 @@ export class KueParser extends CstParser {
       { ALT: () => this.SUBRULE(this.continueStatement) },
       {
         // 比較文: operand compare_op operand
-        // 2番目のトークンが比較演算子であれば比較文
+        // 配列アクセスを考慮して比較演算子を探す
+        // identifier[expr] == operand の場合、最初の7トークンをスキャン
         GATE: () => {
-          const token2 = this.LA(2);
-          return (
-            token2.tokenType === Equals ||
-            token2.tokenType === NotEquals ||
-            token2.tokenType === LessThan ||
-            token2.tokenType === LessThanOrEqual ||
-            token2.tokenType === GreaterThan ||
-            token2.tokenType === GreaterThanOrEqual
-          );
+          // オペランドの後の最初の演算子を探す (最大8トークン先まで)
+          for (let i = 2; i <= 8; i++) {
+            const token = this.LA(i);
+            // 比較演算子が見つかった
+            if (
+              token.tokenType === Equals ||
+              token.tokenType === NotEquals ||
+              token.tokenType === LessThan ||
+              token.tokenType === LessThanOrEqual ||
+              token.tokenType === GreaterThan ||
+              token.tokenType === GreaterThanOrEqual
+            ) {
+              return true;
+            }
+            // 他の演算子や文の終わりが見つかったら比較文ではない
+            if (
+              token.tokenType === Plus ||
+              token.tokenType === PlusWithCarry ||
+              token.tokenType === Minus ||
+              token.tokenType === MinusWithCarry ||
+              token.tokenType === And ||
+              token.tokenType === Or ||
+              token.tokenType === Xor ||
+              token.tokenType === LeftShift ||
+              token.tokenType === LeftShiftArithmetic ||
+              token.tokenType === RightShift ||
+              token.tokenType === RightShiftArithmetic ||
+              token.tokenType === LeftRotate ||
+              token.tokenType === RightRotate ||
+              token.tokenType === LBrace ||
+              token.tokenType === RBrace ||
+              token.tokenType === Assign
+            ) {
+              return false;
+            }
+          }
+          return false;
         },
         ALT: () => this.SUBRULE(this.comparisonStatement),
       },
       {
-        // 二項演算文: identifier = operand operator ...
-        // identifier = の後、4番目が二項演算子であれば二項演算文
+        // 二項演算文: lvalue = operand operator operand
+        // 配列アクセスを考慮して二項演算子を探す
         GATE: () => {
           const token1 = this.LA(1);
-          const token2 = this.LA(2);
-          const token3 = this.LA(3);
-          const token4 = this.LA(4);
-
-          // identifier = の形式であることを確認
-          if (token1.tokenType !== Identifier || token2.tokenType !== Assign) {
+          if (token1.tokenType !== Identifier) {
             return false;
           }
 
-          // 3番目はオペランド（identifier または literal）
-          const isToken3Operand =
-            token3.tokenType === Identifier || token3.tokenType === HexLiteral || token3.tokenType === DecimalLiteral;
+          // lvalue (identifier または identifier[index]) をスキップ
+          let pos = 2;
+          const token2 = this.LA(pos);
+          // 配列アクセスの場合は ] まで進む
+          if (token2.tokenType === LBracket) {
+            pos++;
+            // indexExpression をスキップ (identifier または literal)
+            pos++;
+            // RBracket をスキップ
+            const closeBracket = this.LA(pos);
+            if (closeBracket.tokenType === RBracket) {
+              pos++;
+            }
+          }
 
-          if (!isToken3Operand) {
+          // = をチェック
+          const assignToken = this.LA(pos);
+          if (assignToken.tokenType !== Assign) {
+            return false;
+          }
+          pos++;
+
+          // 最初のオペランド (identifier, identifier[index], literal) をスキップ
+          const operandToken = this.LA(pos);
+          if (operandToken.tokenType === Identifier) {
+            pos++;
+            const maybeOpenBracket = this.LA(pos);
+            if (maybeOpenBracket.tokenType === LBracket) {
+              pos++;
+              pos++; // indexExpression
+              const maybeCloseBracket = this.LA(pos);
+              if (maybeCloseBracket.tokenType === RBracket) {
+                pos++;
+              }
+            }
+          } else if (operandToken.tokenType === HexLiteral || operandToken.tokenType === DecimalLiteral) {
+            pos++;
+          } else {
             return false;
           }
 
-          // 4番目が二項演算子であればtrue
+          // 二項演算子をチェック
+          const opToken = this.LA(pos);
           return (
-            token4.tokenType === Plus ||
-            token4.tokenType === PlusWithCarry ||
-            token4.tokenType === Minus ||
-            token4.tokenType === MinusWithCarry ||
-            token4.tokenType === And ||
-            token4.tokenType === Or ||
-            token4.tokenType === Xor ||
-            token4.tokenType === LeftShift ||
-            token4.tokenType === LeftShiftArithmetic ||
-            token4.tokenType === RightShift ||
-            token4.tokenType === RightShiftArithmetic ||
-            token4.tokenType === LeftRotate ||
-            token4.tokenType === RightRotate
+            opToken.tokenType === Plus ||
+            opToken.tokenType === PlusWithCarry ||
+            opToken.tokenType === Minus ||
+            opToken.tokenType === MinusWithCarry ||
+            opToken.tokenType === And ||
+            opToken.tokenType === Or ||
+            opToken.tokenType === Xor ||
+            opToken.tokenType === LeftShift ||
+            opToken.tokenType === LeftShiftArithmetic ||
+            opToken.tokenType === RightShift ||
+            opToken.tokenType === RightShiftArithmetic ||
+            opToken.tokenType === LeftRotate ||
+            opToken.tokenType === RightRotate
           );
         },
         ALT: () => this.SUBRULE(this.binaryOperationStatement),
@@ -200,19 +260,36 @@ export class KueParser extends CstParser {
   /**
    * 左辺値 (lvalue)
    *
-   * identifier
+   * identifier | identifier[index]
    */
   private lvalue = this.RULE("lvalue", () => {
     this.CONSUME(Identifier);
+    this.OPTION(() => {
+      this.CONSUME(LBracket);
+      this.SUBRULE(this.indexExpression);
+      this.CONSUME(RBracket);
+    });
   });
 
   /**
    * 右辺値 (rvalue)
    *
-   * identifier | literal
+   * identifier | identifier[index] | literal
    */
   private rvalue = this.RULE("rvalue", () => {
-    this.OR([{ ALT: () => this.CONSUME(Identifier) }, { ALT: () => this.SUBRULE(this.literal) }]);
+    this.OR([
+      {
+        ALT: () => {
+          this.CONSUME(Identifier);
+          this.OPTION(() => {
+            this.CONSUME(LBracket);
+            this.SUBRULE(this.indexExpression);
+            this.CONSUME(RBracket);
+          });
+        },
+      },
+      { ALT: () => this.SUBRULE(this.literal) },
+    ]);
   });
 
   /**
@@ -222,6 +299,15 @@ export class KueParser extends CstParser {
    */
   private literal = this.RULE("literal", () => {
     this.OR([{ ALT: () => this.CONSUME(HexLiteral) }, { ALT: () => this.CONSUME(DecimalLiteral) }]);
+  });
+
+  /**
+   * 配列の添字式
+   *
+   * identifier | literal
+   */
+  private indexExpression = this.RULE("indexExpression", () => {
+    this.OR([{ ALT: () => this.CONSUME(Identifier) }, { ALT: () => this.SUBRULE(this.literal) }]);
   });
 
   /**
@@ -264,10 +350,22 @@ export class KueParser extends CstParser {
   /**
    * オペランド
    *
-   * identifier | literal
+   * identifier | identifier[index] | literal
    */
   private operand = this.RULE("operand", () => {
-    this.OR([{ ALT: () => this.CONSUME(Identifier) }, { ALT: () => this.SUBRULE(this.literal) }]);
+    this.OR([
+      {
+        ALT: () => {
+          this.CONSUME(Identifier);
+          this.OPTION(() => {
+            this.CONSUME(LBracket);
+            this.SUBRULE(this.indexExpression);
+            this.CONSUME(RBracket);
+          });
+        },
+      },
+      { ALT: () => this.SUBRULE(this.literal) },
+    ]);
   });
 
   /**

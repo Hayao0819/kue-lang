@@ -65,6 +65,9 @@ export interface LValueCst extends CstNode {
   name: "lvalue";
   children: {
     Identifier: IToken[];
+    LBracket?: IToken[];
+    indexExpression?: IndexExpressionCst[];
+    RBracket?: IToken[];
   };
 }
 
@@ -75,6 +78,9 @@ export interface RValueCst extends CstNode {
   name: "rvalue";
   children: {
     Identifier?: IToken[];
+    LBracket?: IToken[];
+    indexExpression?: IndexExpressionCst[];
+    RBracket?: IToken[];
     literal?: LiteralCst[];
   };
 }
@@ -87,6 +93,17 @@ export interface LiteralCst extends CstNode {
   children: {
     HexLiteral?: IToken[];
     DecimalLiteral?: IToken[];
+  };
+}
+
+/**
+ * 配列の添字式のCST
+ */
+export interface IndexExpressionCst extends CstNode {
+  name: "indexExpression";
+  children: {
+    Identifier?: IToken[];
+    literal?: LiteralCst[];
   };
 }
 
@@ -133,6 +150,9 @@ export interface OperandCst extends CstNode {
   name: "operand";
   children: {
     Identifier?: IToken[];
+    LBracket?: IToken[];
+    indexExpression?: IndexExpressionCst[];
+    RBracket?: IToken[];
     literal?: LiteralCst[];
   };
 }

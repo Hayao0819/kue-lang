@@ -4,6 +4,7 @@
  */
 
 import type {
+  ArrayAccess,
   AssignmentStatement,
   BinaryOperationStatement,
   BuiltinStatement,
@@ -163,10 +164,38 @@ function generateStatement(statement: Statement, context: CodeGenContext): strin
  *                ST ACC, (80H)
  * foo = bar   → LD ACC, (81H)
  *                ST ACC, (80H)
+ * foo[i] = bar[j]  → 両方が変数添字配列の場合は特別処理
  */
 function generateAssignment(statement: AssignmentStatement, symbolTable: Map<string, number>): string {
   const lines: string[] = [];
 
+  // 特殊ケース: 両方が変数添字の配列アクセスの場合
+  // foo[i] = bar[j]  →  LD IX, (jのアドレス)
+  //                     LD ACC, (IX+barのアドレス)
+  //                     LD IX, (iのアドレス)
+  //                     ST ACC, (IX+fooのアドレス)
+  if (
+    statement.left.type === "ArrayAccess" &&
+    statement.left.index.type === "Variable" &&
+    statement.right.type === "ArrayAccess" &&
+    statement.right.index.type === "Variable"
+  ) {
+    // 右辺の配列アクセスをロード
+    const rightBaseAddr = getVariableAddress(statement.right.array, symbolTable);
+    const rightIndexAddr = getVariableAddress(statement.right.index.name, symbolTable);
+    lines.push(`LD IX, ${formatDataAddress(rightIndexAddr)}`);
+    lines.push(`LD ACC, (IX+${rightBaseAddr.toString(16).toUpperCase()}H)`);
+
+    // 左辺の配列アクセスにストア
+    const leftBaseAddr = getVariableAddress(statement.left.array, symbolTable);
+    const leftIndexAddr = getVariableAddress(statement.left.index.name, symbolTable);
+    lines.push(`LD IX, ${formatDataAddress(leftIndexAddr)}`);
+    lines.push(`ST ACC, (IX+${leftBaseAddr.toString(16).toUpperCase()}H)`);
+
+    return lines.join("\n");
+  }
+
+  // 通常ケース
   // 右辺値をアキュムレータにロード
   const loadInstr = generateLoad(statement.right, symbolTable);
   lines.push(loadInstr);
@@ -190,8 +219,8 @@ function generateLoad(rvalue: RValue, symbolTable: Map<string, number>): string 
     const address = getVariableAddress(rvalue.name, symbolTable);
     return `LD ACC, ${formatDataAddress(address)}`;
   } else if (rvalue.type === "ArrayAccess") {
-    // 配列アクセスは未実装（フェーズ4）
-    throw new Error("Array access is not implemented yet");
+    // 配列アクセス: array[index]
+    return generateArrayLoad(rvalue, symbolTable);
   }
   const _exhaustive: never = rvalue;
   return _exhaustive;
@@ -206,8 +235,8 @@ function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string
     const address = getVariableAddress(lvalue.name, symbolTable);
     return `ST ACC, ${formatDataAddress(address)}`;
   } else if (lvalue.type === "ArrayAccess") {
-    // 配列アクセスは未実装（フェーズ4）
-    throw new Error("Array access is not implemented yet");
+    // 配列アクセス: array[index]
+    return generateArrayStore(lvalue, symbolTable);
   }
   const _exhaustive: never = lvalue;
   return _exhaustive;
@@ -249,8 +278,8 @@ function generateOperandLoad(operand: Operand, symbolTable: Map<string, number>)
     const address = getVariableAddress(operand.name, symbolTable);
     return `LD ACC, ${formatDataAddress(address)}`;
   } else if (operand.type === "ArrayAccess") {
-    // 配列アクセスは未実装（フェーズ4）
-    throw new Error("Array access is not implemented yet");
+    // 配列アクセス: array[index]
+    return generateArrayLoad(operand, symbolTable);
   }
   const _exhaustive: never = operand;
   return _exhaustive;
@@ -314,7 +343,14 @@ function formatOperand(operand: Operand, symbolTable: Map<string, number>): stri
     const address = getVariableAddress(operand.name, symbolTable);
     return formatDataAddress(address);
   } else if (operand.type === "ArrayAccess") {
-    throw new Error("Array access is not implemented yet");
+    // 配列アクセスの場合、定数添字のみ直接フォーマット可能
+    // 変数添字の場合はformatOperandは使えないためエラー
+    if (operand.index.type === "Literal") {
+      const baseAddr = getVariableAddress(operand.array, symbolTable);
+      const finalAddr = baseAddr + operand.index.value;
+      return formatDataAddress(finalAddr);
+    }
+    throw new Error("Variable index array access cannot be formatted as operand string");
   }
   const _exhaustive: never = operand;
   return _exhaustive;
@@ -517,4 +553,64 @@ function generateConditionalJump(condition: FlagCondition, label: string, negate
 
   const jumpInstruction = negate ? negatedConditionMap[condition] : conditionMap[condition];
   return `${jumpInstruction} ${label}`;
+}
+
+/**
+ * 配列アクセスのロード命令を生成
+ *
+ * 定数添字の場合:
+ *   foo = bar[2]  →  LD ACC, (183H)  // bar + 2のアドレス
+ *
+ * 変数添字の場合:
+ *   foo = bar[i]  →  LD IX, (182H)     // iの値をIXにロード
+ *                    LD ACC, (IX+181H)  // bar[i]をACCにロード
+ */
+function generateArrayLoad(arrayAccess: ArrayAccess, symbolTable: Map<string, number>): string {
+  const baseAddr = getVariableAddress(arrayAccess.array, symbolTable);
+
+  if (arrayAccess.index.type === "Literal") {
+    // 定数添字: 直接アドレスを計算
+    const offset = arrayAccess.index.value;
+    const finalAddr = baseAddr + offset;
+    return `LD ACC, ${formatDataAddress(finalAddr)}`;
+  } else if (arrayAccess.index.type === "Variable") {
+    // 変数添字: IXレジスタを使った間接アドレッシング
+    const indexAddr = getVariableAddress(arrayAccess.index.name, symbolTable);
+    const lines: string[] = [];
+    lines.push(`LD IX, ${formatDataAddress(indexAddr)}`);
+    lines.push(`LD ACC, (IX+${baseAddr.toString(16).toUpperCase()}H)`);
+    return lines.join("\n");
+  }
+  const _exhaustive: never = arrayAccess.index;
+  return _exhaustive;
+}
+
+/**
+ * 配列アクセスのストア命令を生成
+ *
+ * 定数添字の場合:
+ *   foo[2] = bar  →  ST ACC, (183H)  // foo + 2のアドレス
+ *
+ * 変数添字の場合:
+ *   foo[i] = bar  →  LD IX, (182H)     // iの値をIXにロード
+ *                    ST ACC, (IX+180H)  // foo[i]にACCをストア
+ */
+function generateArrayStore(arrayAccess: ArrayAccess, symbolTable: Map<string, number>): string {
+  const baseAddr = getVariableAddress(arrayAccess.array, symbolTable);
+
+  if (arrayAccess.index.type === "Literal") {
+    // 定数添字: 直接アドレスを計算
+    const offset = arrayAccess.index.value;
+    const finalAddr = baseAddr + offset;
+    return `ST ACC, ${formatDataAddress(finalAddr)}`;
+  } else if (arrayAccess.index.type === "Variable") {
+    // 変数添字: IXレジスタを使った間接アドレッシング
+    const indexAddr = getVariableAddress(arrayAccess.index.name, symbolTable);
+    const lines: string[] = [];
+    lines.push(`LD IX, ${formatDataAddress(indexAddr)}`);
+    lines.push(`ST ACC, (IX+${baseAddr.toString(16).toUpperCase()}H)`);
+    return lines.join("\n");
+  }
+  const _exhaustive: never = arrayAccess.index;
+  return _exhaustive;
 }

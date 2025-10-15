@@ -32,6 +32,7 @@ import type {
   ContinueStatementCst,
   FlagConditionCst,
   IfStatementCst,
+  IndexExpressionCst,
   LiteralCst,
   LoopStatementCst,
   LValueCst,
@@ -130,10 +131,25 @@ export class KueAstBuilder extends BaseCstVisitor {
   /**
    * 左辺値を訪問
    */
-  lvalue(ctx: LValueCst["children"]): Variable {
+  lvalue(ctx: LValueCst["children"]): LValue {
     const token = ctx.Identifier[0];
     if (!token) {
       throw new Error("Missing identifier in lvalue");
+    }
+
+    // 配列アクセスかどうかをチェック
+    if (ctx.indexExpression && ctx.indexExpression.length > 0) {
+      const indexExpr = ctx.indexExpression[0];
+      if (!indexExpr) {
+        throw new Error("Missing index expression");
+      }
+      const index = this.visit(indexExpr) as Variable | Literal;
+      return {
+        type: "ArrayAccess",
+        array: token.image,
+        index,
+        location: this.getLocation(token),
+      };
     }
 
     return {
@@ -152,6 +168,22 @@ export class KueAstBuilder extends BaseCstVisitor {
       if (!token) {
         throw new Error("Missing identifier in rvalue");
       }
+
+      // 配列アクセスかどうかをチェック
+      if (ctx.indexExpression && ctx.indexExpression.length > 0) {
+        const indexExpr = ctx.indexExpression[0];
+        if (!indexExpr) {
+          throw new Error("Missing index expression");
+        }
+        const index = this.visit(indexExpr) as Variable | Literal;
+        return {
+          type: "ArrayAccess",
+          array: token.image,
+          index,
+          location: this.getLocation(token),
+        };
+      }
+
       return {
         type: "Variable",
         name: token.image,
@@ -187,6 +219,27 @@ export class KueAstBuilder extends BaseCstVisitor {
       raw,
       location: this.getLocation(token),
     };
+  }
+
+  /**
+   * 配列の添字式を訪問
+   */
+  indexExpression(ctx: IndexExpressionCst["children"]): Variable | Literal {
+    if (ctx.Identifier) {
+      const token = ctx.Identifier[0];
+      if (!token) {
+        throw new Error("Missing identifier in index expression");
+      }
+      return {
+        type: "Variable",
+        name: token.image,
+        location: this.getLocation(token),
+      };
+    }
+    if (ctx.literal) {
+      return this.visit(ctx.literal) as Literal;
+    }
+    throw new Error("Unknown index expression type");
   }
 
   /**
@@ -236,6 +289,22 @@ export class KueAstBuilder extends BaseCstVisitor {
       if (!token) {
         throw new Error("Missing identifier in operand");
       }
+
+      // 配列アクセスかどうかをチェック
+      if (ctx.indexExpression && ctx.indexExpression.length > 0) {
+        const indexExpr = ctx.indexExpression[0];
+        if (!indexExpr) {
+          throw new Error("Missing index expression");
+        }
+        const index = this.visit(indexExpr) as Variable | Literal;
+        return {
+          type: "ArrayAccess",
+          array: token.image,
+          index,
+          location: this.getLocation(token),
+        };
+      }
+
       return {
         type: "Variable",
         name: token.image,
