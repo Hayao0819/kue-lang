@@ -1,0 +1,35 @@
+// 比較演算の例
+// Comparison operations example
+
+var a @ 0x180
+var b @ 0x181
+var result @ 0x182
+
+// 値の初期化
+a = 10
+b = 5
+
+// 等価比較
+a == b      // a equals b? (no, sets ZERO flag to 0)
+
+// 不等価比較
+a != b      // a not equals b? (yes, sets ZERO flag appropriately)
+
+// 小なり比較
+b < a       // b less than a? (yes)
+
+// 小なりイコール比較
+b <= a      // b less than or equal to a? (yes)
+
+// 大なり比較
+a > b       // a greater than b? (yes)
+
+// 大なりイコール比較
+a >= b      // a greater than or equal to b? (yes)
+
+// リテラルとの比較
+result = 10
+result == 10    // result equals 10? (yes)
+result != 0     // result not equals 0? (yes)
+
+halt

@@ -1,10 +1,20 @@
 import type { IToken } from "chevrotain";
 import type {
   AssignmentStatement,
+  BinaryOperationStatement,
+  BinaryOperator,
+  BreakStatement,
   BuiltinInstruction,
   BuiltinStatement,
+  ComparisonOperator,
+  ComparisonStatement,
+  ContinueStatement,
+  FlagCondition,
+  IfStatement,
   Literal,
+  LoopStatement,
   LValue,
+  Operand,
   Program,
   RValue,
   Statement,
@@ -13,9 +23,19 @@ import type {
 } from "../ast/index.js";
 import type {
   AssignmentStatementCst,
+  BinaryOperationStatementCst,
+  BinaryOperatorCst,
+  BreakStatementCst,
   BuiltinStatementCst,
+  ComparisonOperatorCst,
+  ComparisonStatementCst,
+  ContinueStatementCst,
+  FlagConditionCst,
+  IfStatementCst,
   LiteralCst,
+  LoopStatementCst,
   LValueCst,
+  OperandCst,
   ProgramCst,
   RValueCst,
   StatementCst,
@@ -66,6 +86,24 @@ export class KueAstBuilder extends BaseCstVisitor {
    * 文を訪問
    */
   statement(ctx: StatementCst["children"]): Statement {
+    if (ctx.loopStatement) {
+      return this.visit(ctx.loopStatement) as LoopStatement;
+    }
+    if (ctx.ifStatement) {
+      return this.visit(ctx.ifStatement) as IfStatement;
+    }
+    if (ctx.breakStatement) {
+      return this.visit(ctx.breakStatement) as BreakStatement;
+    }
+    if (ctx.continueStatement) {
+      return this.visit(ctx.continueStatement) as ContinueStatement;
+    }
+    if (ctx.comparisonStatement) {
+      return this.visit(ctx.comparisonStatement) as ComparisonStatement;
+    }
+    if (ctx.binaryOperationStatement) {
+      return this.visit(ctx.binaryOperationStatement) as BinaryOperationStatement;
+    }
     if (ctx.assignmentStatement) {
       return this.visit(ctx.assignmentStatement) as AssignmentStatement;
     }
@@ -152,6 +190,94 @@ export class KueAstBuilder extends BaseCstVisitor {
   }
 
   /**
+   * 二項演算文を訪問
+   */
+  binaryOperationStatement(ctx: BinaryOperationStatementCst["children"]): BinaryOperationStatement {
+    const destination = this.visit(ctx.lvalue) as LValue;
+    const operator = this.visit(ctx.binaryOperator) as BinaryOperator;
+    const left = this.visit(ctx.left) as Operand;
+    const right = this.visit(ctx.right) as Operand;
+
+    return {
+      type: "BinaryOperationStatement",
+      destination,
+      operator,
+      left,
+      right,
+    };
+  }
+
+  /**
+   * 二項演算子を訪問
+   */
+  binaryOperator(ctx: BinaryOperatorCst["children"]): BinaryOperator {
+    if (ctx.Plus?.[0]) return "+";
+    if (ctx.PlusWithCarry?.[0]) return "+c";
+    if (ctx.Minus?.[0]) return "-";
+    if (ctx.MinusWithCarry?.[0]) return "-c";
+    if (ctx.And?.[0]) return "&";
+    if (ctx.Or?.[0]) return "|";
+    if (ctx.Xor?.[0]) return "^";
+    if (ctx.LeftShift?.[0]) return "<<";
+    if (ctx.LeftShiftArithmetic?.[0]) return "<<a";
+    if (ctx.RightShift?.[0]) return ">>";
+    if (ctx.RightShiftArithmetic?.[0]) return ">>a";
+    if (ctx.LeftRotate?.[0]) return "<<<";
+    if (ctx.RightRotate?.[0]) return ">>>";
+    throw new Error("Unknown binary operator");
+  }
+
+  /**
+   * オペランドを訪問
+   */
+  operand(ctx: OperandCst["children"]): Operand {
+    if (ctx.Identifier) {
+      const token = ctx.Identifier[0];
+      if (!token) {
+        throw new Error("Missing identifier in operand");
+      }
+      return {
+        type: "Variable",
+        name: token.image,
+        location: this.getLocation(token),
+      };
+    }
+    if (ctx.literal) {
+      return this.visit(ctx.literal) as Literal;
+    }
+    throw new Error("Unknown operand type");
+  }
+
+  /**
+   * 比較文を訪問
+   */
+  comparisonStatement(ctx: ComparisonStatementCst["children"]): ComparisonStatement {
+    const operator = this.visit(ctx.comparisonOperator) as ComparisonOperator;
+    const left = this.visit(ctx.left) as Operand;
+    const right = this.visit(ctx.right) as Operand;
+
+    return {
+      type: "ComparisonStatement",
+      operator,
+      left,
+      right,
+    };
+  }
+
+  /**
+   * 比較演算子を訪問
+   */
+  comparisonOperator(ctx: ComparisonOperatorCst["children"]): ComparisonOperator {
+    if (ctx.Equals?.[0]) return "==";
+    if (ctx.NotEquals?.[0]) return "!=";
+    if (ctx.LessThan?.[0]) return "<";
+    if (ctx.LessThanOrEqual?.[0]) return "<=";
+    if (ctx.GreaterThan?.[0]) return ">";
+    if (ctx.GreaterThanOrEqual?.[0]) return ">=";
+    throw new Error("Unknown comparison operator");
+  }
+
+  /**
    * 組み込み命令を訪問
    */
   builtinStatement(ctx: BuiltinStatementCst["children"]): BuiltinStatement {
@@ -213,6 +339,109 @@ export class KueAstBuilder extends BaseCstVisitor {
       address,
       location: this.getLocation(nameToken),
     };
+  }
+
+  /**
+   * loop文を訪問
+   */
+  loopStatement(ctx: LoopStatementCst["children"]): LoopStatement {
+    const loopToken = ctx.Loop[0];
+    if (!loopToken) {
+      throw new Error("Missing loop token");
+    }
+
+    const body: Statement[] = [];
+    if (ctx.statement) {
+      for (const stmtCst of ctx.statement) {
+        const stmt = this.visit(stmtCst) as Statement;
+        body.push(stmt);
+      }
+    }
+
+    return {
+      type: "LoopStatement",
+      body,
+      location: this.getLocation(loopToken),
+    };
+  }
+
+  /**
+   * if文を訪問
+   */
+  ifStatement(ctx: IfStatementCst["children"]): IfStatement {
+    const ifToken = ctx.If[0];
+    if (!ifToken) {
+      throw new Error("Missing if token");
+    }
+
+    const condition = this.visit(ctx.flagCondition) as FlagCondition;
+
+    const body: Statement[] = [];
+    if (ctx.statement) {
+      for (const stmtCst of ctx.statement) {
+        const stmt = this.visit(stmtCst) as Statement;
+        body.push(stmt);
+      }
+    }
+
+    return {
+      type: "IfStatement",
+      condition,
+      body,
+      location: this.getLocation(ifToken),
+    };
+  }
+
+  /**
+   * break文を訪問
+   */
+  breakStatement(ctx: BreakStatementCst["children"]): BreakStatement {
+    const breakToken = ctx.Break[0];
+    if (!breakToken) {
+      throw new Error("Missing break token");
+    }
+
+    return {
+      type: "BreakStatement",
+      location: this.getLocation(breakToken),
+    };
+  }
+
+  /**
+   * continue文を訪問
+   */
+  continueStatement(ctx: ContinueStatementCst["children"]): ContinueStatement {
+    const continueToken = ctx.Continue[0];
+    if (!continueToken) {
+      throw new Error("Missing continue token");
+    }
+
+    return {
+      type: "ContinueStatement",
+      location: this.getLocation(continueToken),
+    };
+  }
+
+  /**
+   * フラグ条件を訪問
+   */
+  flagCondition(ctx: FlagConditionCst["children"]): FlagCondition {
+    if (ctx.Zero?.[0]) return "ZERO";
+    if (ctx.NotZero?.[0]) return "NOT_ZERO";
+    if (ctx.Negative?.[0]) return "NEGATIVE";
+    if (ctx.Positive?.[0]) return "POSITIVE";
+    if (ctx.Carry?.[0]) return "CARRY";
+    if (ctx.NotCarry?.[0]) return "NOT_CARRY";
+    if (ctx.Overflow?.[0]) return "OVERFLOW";
+    if (ctx.ZeroOrPositive?.[0]) return "ZERO_OR_POSITIVE";
+    if (ctx.ZeroOrNegative?.[0]) return "ZERO_OR_NEGATIVE";
+    if (ctx.Gte?.[0]) return "GTE";
+    if (ctx.Lt?.[0]) return "LT";
+    if (ctx.Gt?.[0]) return "GT";
+    if (ctx.Lte?.[0]) return "LTE";
+    if (ctx.NoInput?.[0]) return "NO_INPUT";
+    if (ctx.NoOutput?.[0]) return "NO_OUTPUT";
+    throw new Error("Unknown flag condition");
   }
 
   /**

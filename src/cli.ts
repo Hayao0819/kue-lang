@@ -6,8 +6,8 @@
  */
 
 import { readFileSync } from "node:fs";
-import { parse } from "./parser/index.js";
 import { generateCode } from "./codegen/index.js";
+import { parse } from "./parser/index.js";
 
 function main() {
   const args = process.argv.slice(2);
@@ -18,6 +18,10 @@ function main() {
   }
 
   const inputFile = args[0];
+  if (!inputFile) {
+    console.error("Error: No input file specified");
+    process.exit(1);
+  }
 
   try {
     // ソースコードを読み込み

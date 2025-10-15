@@ -1,0 +1,33 @@
+// 算術演算のサンプルプログラム
+// 加算、減算、キャリー付き演算を実演
+
+var a @ 0x180
+var b @ 0x181
+var sum @ 0x182
+var diff @ 0x183
+var result @ 0x184
+
+// 初期値を設定
+a = 10
+b = 5
+
+// 加算: sum = a + b
+sum = a + b
+
+// 減算: diff = a - b
+diff = a - b
+
+// キャリーフラグをセット
+set_carry_flag
+
+// キャリー付き加算: result = a +c b
+result = a +c b
+
+// キャリーフラグをリセット
+reset_carry_flag
+
+// キャリー付き減算: result = a -c b
+result = a -c b
+
+// 終了
+halt

@@ -1,0 +1,29 @@
+// ループの例
+// Loop example
+
+var counter @ 0x180
+var limit @ 0x181
+
+// カウンタを初期化
+counter = 0
+limit = 10
+
+// 無限ループ（breakで抜ける）
+loop {
+  // カウンタをインクリメント
+  counter = counter + 1
+
+  // カウンタを出力
+  output
+
+  // カウンタが上限に達したかチェック
+  counter == limit
+
+  // ZEROフラグが立っていたら（等しかったら）breakで抜ける
+  if ZERO {
+    break
+  }
+}
+
+// プログラム終了
+halt

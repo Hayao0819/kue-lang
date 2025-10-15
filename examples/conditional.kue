@@ -1,0 +1,34 @@
+// 条件分岐の例
+// Conditional branching example
+
+var value @ 0x180
+var result @ 0x181
+
+// 値を入力
+input
+value = 0  // ACCの値をvalueに保存
+
+// 値がゼロかチェック
+value == 0
+
+if ZERO {
+  // ゼロの場合
+  result = 0xFF
+  output
+}
+
+// 値が負かチェック
+if NEGATIVE {
+  // 負の場合
+  result = 0
+  output
+}
+
+// 値が正かチェック
+if POSITIVE {
+  // 正の場合
+  result = 1
+  output
+}
+
+halt

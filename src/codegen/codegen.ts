@@ -4,16 +4,39 @@
  */
 
 import type {
+  AssignmentStatement,
+  BinaryOperationStatement,
+  BuiltinStatement,
+  ComparisonStatement,
+  FlagCondition,
+  IfStatement,
+  LoopStatement,
+  LValue,
+  Operand,
   Program,
+  RValue,
   Statement,
   VariableDeclaration,
-  AssignmentStatement,
-  BuiltinStatement,
-  LValue,
-  RValue,
-  Variable,
-  Literal,
 } from "../ast/index.js";
+
+/**
+ * ラベル生成用のカウンタ
+ */
+let labelCounter = 0;
+
+/**
+ * ユニークなラベルを生成
+ */
+function generateLabel(prefix: string): string {
+  return `${prefix}_${labelCounter++}`;
+}
+
+/**
+ * ラベルカウンタをリセット
+ */
+function resetLabelCounter(): void {
+  labelCounter = 0;
+}
 
 /**
  * ASTからアセンブリコードを生成
@@ -21,6 +44,13 @@ import type {
 export function generateCode(program: Program): string {
   const output: string[] = [];
   const symbolTable = buildSymbolTable(program.variables);
+  const context: CodeGenContext = {
+    symbolTable,
+    loopStack: [],
+  };
+
+  // ラベルカウンタをリセット
+  resetLabelCounter();
 
   // 変数宣言をコメントとして出力
   for (const variable of program.variables) {
@@ -34,13 +64,29 @@ export function generateCode(program: Program): string {
 
   // 各文のコードを生成
   for (const statement of program.body) {
-    const code = generateStatement(statement, symbolTable);
+    const code = generateStatement(statement, context);
     if (code) {
       output.push(code);
     }
   }
 
   return output.join("\n");
+}
+
+/**
+ * コード生成コンテキスト
+ */
+interface CodeGenContext {
+  symbolTable: Map<string, number>;
+  loopStack: LoopLabels[];
+}
+
+/**
+ * ループのラベル情報
+ */
+interface LoopLabels {
+  startLabel: string;
+  endLabel: string;
 }
 
 /**
@@ -81,27 +127,33 @@ function formatDataAddress(address: number): string {
 /**
  * 文のコード生成
  */
-function generateStatement(statement: Statement, symbolTable: Map<string, number>): string {
+function generateStatement(statement: Statement, context: CodeGenContext): string {
   switch (statement.type) {
     case "AssignmentStatement":
-      return generateAssignment(statement, symbolTable);
+      return generateAssignment(statement, context.symbolTable);
+    case "BinaryOperationStatement":
+      return generateBinaryOperation(statement, context.symbolTable);
+    case "ComparisonStatement":
+      return generateComparison(statement, context.symbolTable);
     case "BuiltinStatement":
       return generateBuiltin(statement);
-    // 他の文は未実装（フェーズ3以降）
-    case "ComparisonStatement":
-    case "BinaryOperationStatement":
-    case "IfStatement":
     case "LoopStatement":
+      return generateLoop(statement, context);
+    case "IfStatement":
+      return generateIf(statement, context);
     case "BreakStatement":
+      return generateBreak(context);
     case "ContinueStatement":
+      return generateContinue(context);
     case "MacroCallStatement":
     case "MacroDeclaration":
     case "AsmBlock":
       throw new Error(`Unsupported statement type: ${statement.type}`);
-    default:
+    default: {
       // TypeScriptの網羅性チェック
       const _exhaustive: never = statement;
-      throw new Error(`Unknown statement type: ${(_exhaustive as any).type}`);
+      return _exhaustive;
+    }
   }
 }
 
@@ -140,10 +192,9 @@ function generateLoad(rvalue: RValue, symbolTable: Map<string, number>): string 
   } else if (rvalue.type === "ArrayAccess") {
     // 配列アクセスは未実装（フェーズ4）
     throw new Error("Array access is not implemented yet");
-  } else {
-    const _exhaustive: never = rvalue;
-    throw new Error(`Unknown RValue type: ${(_exhaustive as any).type}`);
   }
+  const _exhaustive: never = rvalue;
+  return _exhaustive;
 }
 
 /**
@@ -157,10 +208,135 @@ function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string
   } else if (lvalue.type === "ArrayAccess") {
     // 配列アクセスは未実装（フェーズ4）
     throw new Error("Array access is not implemented yet");
-  } else {
-    const _exhaustive: never = lvalue;
-    throw new Error(`Unknown LValue type: ${(_exhaustive as any).type}`);
   }
+  const _exhaustive: never = lvalue;
+  return _exhaustive;
+}
+
+/**
+ * 二項演算文のコード生成
+ * result = foo + bar  →  LD ACC, (180H)
+ *                        ADD ACC, (181H)
+ *                        ST ACC, (182H)
+ */
+function generateBinaryOperation(statement: BinaryOperationStatement, symbolTable: Map<string, number>): string {
+  const lines: string[] = [];
+
+  // 左オペランドをアキュムレータにロード
+  const loadInstr = generateOperandLoad(statement.left, symbolTable);
+  lines.push(loadInstr);
+
+  // 演算命令を生成
+  const opInstr = generateBinaryOperationInstruction(statement.operator, statement.right, symbolTable);
+  lines.push(opInstr);
+
+  // 結果をデスティネーションにストア
+  const storeInstr = generateStore(statement.destination, symbolTable);
+  lines.push(storeInstr);
+
+  return lines.join("\n");
+}
+
+/**
+ * オペランドのロード命令を生成
+ */
+function generateOperandLoad(operand: Operand, symbolTable: Map<string, number>): string {
+  if (operand.type === "Literal") {
+    // リテラル: LD ACC, <value>
+    return `LD ACC, ${operand.value}`;
+  } else if (operand.type === "Variable") {
+    // 変数: LD ACC, (<address>)
+    const address = getVariableAddress(operand.name, symbolTable);
+    return `LD ACC, ${formatDataAddress(address)}`;
+  } else if (operand.type === "ArrayAccess") {
+    // 配列アクセスは未実装（フェーズ4）
+    throw new Error("Array access is not implemented yet");
+  }
+  const _exhaustive: never = operand;
+  return _exhaustive;
+}
+
+/**
+ * 二項演算命令を生成
+ */
+function generateBinaryOperationInstruction(
+  operator: string,
+  rightOperand: Operand,
+  symbolTable: Map<string, number>,
+): string {
+  // 右オペランドの表現を取得
+  const rightOperandStr = formatOperand(rightOperand, symbolTable);
+
+  // 演算子に応じた命令を生成
+  switch (operator) {
+    // 算術演算
+    case "+":
+      return `ADD ACC, ${rightOperandStr}`;
+    case "+c":
+      return `ADC ACC, ${rightOperandStr}`;
+    case "-":
+      return `SUB ACC, ${rightOperandStr}`;
+    case "-c":
+      return `SBC ACC, ${rightOperandStr}`;
+    // 論理演算
+    case "&":
+      return `AND ACC, ${rightOperandStr}`;
+    case "|":
+      return `OR ACC, ${rightOperandStr}`;
+    case "^":
+      return `EOR ACC, ${rightOperandStr}`;
+    // シフト演算
+    case "<<":
+      return `SLL ACC, ${rightOperandStr}`;
+    case "<<a":
+      return `SLA ACC, ${rightOperandStr}`;
+    case ">>":
+      return `SRL ACC, ${rightOperandStr}`;
+    case ">>a":
+      return `SRA ACC, ${rightOperandStr}`;
+    // ローテート演算
+    case "<<<":
+      return `RLL ACC, ${rightOperandStr}`;
+    case ">>>":
+      return `RRL ACC, ${rightOperandStr}`;
+    default:
+      throw new Error(`Unknown binary operator: ${operator}`);
+  }
+}
+
+/**
+ * オペランドをアセンブリ形式の文字列にフォーマット
+ */
+function formatOperand(operand: Operand, symbolTable: Map<string, number>): string {
+  if (operand.type === "Literal") {
+    return `${operand.value}`;
+  } else if (operand.type === "Variable") {
+    const address = getVariableAddress(operand.name, symbolTable);
+    return formatDataAddress(address);
+  } else if (operand.type === "ArrayAccess") {
+    throw new Error("Array access is not implemented yet");
+  }
+  const _exhaustive: never = operand;
+  return _exhaustive;
+}
+
+/**
+ * 比較文のコード生成
+ * foo == bar  →  LD ACC, (180H)
+ *                CMP ACC, (181H)
+ */
+function generateComparison(statement: ComparisonStatement, symbolTable: Map<string, number>): string {
+  const lines: string[] = [];
+
+  // 左オペランドをアキュムレータにロード
+  const loadInstr = generateOperandLoad(statement.left, symbolTable);
+  lines.push(loadInstr);
+
+  // 右オペランドをCMP命令で比較
+  const rightOperandStr = formatOperand(statement.right, symbolTable);
+  lines.push(`CMP ACC, ${rightOperandStr}`);
+
+  return lines.join("\n");
 }
 
 /**
@@ -180,9 +356,10 @@ function generateBuiltin(statement: BuiltinStatement): string {
       return "SCF";
     case "reset_carry_flag":
       return "RCF";
-    default:
+    default: {
       const _exhaustive: never = statement.instruction;
       throw new Error(`Unknown builtin instruction: ${_exhaustive}`);
+    }
   }
 }
 
@@ -195,4 +372,149 @@ function getVariableAddress(name: string, symbolTable: Map<string, number>): num
     throw new Error(`Undefined variable: ${name}`);
   }
   return address;
+}
+
+/**
+ * loop文のコード生成
+ * loop { ... }  →  LOOP_START_0:
+ *                   ...
+ *                   JMP LOOP_START_0
+ *                   LOOP_END_0:
+ */
+function generateLoop(statement: LoopStatement, context: CodeGenContext): string {
+  const lines: string[] = [];
+  const startLabel = generateLabel("LOOP_START");
+  const endLabel = generateLabel("LOOP_END");
+
+  // ループスタックにラベルをプッシュ（break/continue用）
+  context.loopStack.push({ startLabel, endLabel });
+
+  // ループ開始ラベル
+  lines.push(`${startLabel}:`);
+
+  // ループ本体のコードを生成
+  for (const stmt of statement.body) {
+    const code = generateStatement(stmt, context);
+    if (code) {
+      lines.push(code);
+    }
+  }
+
+  // ループの先頭に戻る
+  lines.push(`JMP ${startLabel}`);
+
+  // ループ終了ラベル
+  lines.push(`${endLabel}:`);
+
+  // ループスタックからポップ
+  context.loopStack.pop();
+
+  return lines.join("\n");
+}
+
+/**
+ * if文のコード生成
+ * if ZERO { ... }  →  JMP/COND END_IF_0
+ *                      ...
+ *                      END_IF_0:
+ */
+function generateIf(statement: IfStatement, context: CodeGenContext): string {
+  const lines: string[] = [];
+  const endLabel = generateLabel("END_IF");
+
+  // フラグ条件の逆条件でジャンプ（条件が偽ならスキップ）
+  const jumpInstr = generateConditionalJump(statement.condition, endLabel, true);
+  lines.push(jumpInstr);
+
+  // if本体のコードを生成
+  for (const stmt of statement.body) {
+    const code = generateStatement(stmt, context);
+    if (code) {
+      lines.push(code);
+    }
+  }
+
+  // 終了ラベル
+  lines.push(`${endLabel}:`);
+
+  return lines.join("\n");
+}
+
+/**
+ * break文のコード生成
+ * break  →  JMP LOOP_END_N
+ */
+function generateBreak(context: CodeGenContext): string {
+  if (context.loopStack.length === 0) {
+    throw new Error("break statement outside of loop");
+  }
+  const currentLoop = context.loopStack[context.loopStack.length - 1];
+  if (!currentLoop) {
+    throw new Error("break statement outside of loop");
+  }
+  return `JMP ${currentLoop.endLabel}`;
+}
+
+/**
+ * continue文のコード生成
+ * continue  →  JMP LOOP_START_N
+ */
+function generateContinue(context: CodeGenContext): string {
+  if (context.loopStack.length === 0) {
+    throw new Error("continue statement outside of loop");
+  }
+  const currentLoop = context.loopStack[context.loopStack.length - 1];
+  if (!currentLoop) {
+    throw new Error("continue statement outside of loop");
+  }
+  return `JMP ${currentLoop.startLabel}`;
+}
+
+/**
+ * フラグ条件に基づいた条件ジャンプ命令を生成
+ * @param condition フラグ条件
+ * @param label ジャンプ先ラベル
+ * @param negate true の場合、条件を反転（条件が偽の場合にジャンプ）
+ */
+function generateConditionalJump(condition: FlagCondition, label: string, negate: boolean): string {
+  // 条件を反転する場合のマッピング
+  const negatedConditionMap: Record<FlagCondition, string> = {
+    ZERO: "JNZ",
+    NOT_ZERO: "JZ",
+    NEGATIVE: "JP",
+    POSITIVE: "JN",
+    CARRY: "JNC",
+    NOT_CARRY: "JC",
+    OVERFLOW: "JNO",
+    ZERO_OR_POSITIVE: "JN",
+    ZERO_OR_NEGATIVE: "JP",
+    GTE: "JLT",
+    LT: "JGE",
+    GT: "JLE",
+    LTE: "JGT",
+    NO_INPUT: "JIN",
+    NO_OUTPUT: "JOUT",
+  };
+
+  // 条件をそのまま使う場合のマッピング
+  const conditionMap: Record<FlagCondition, string> = {
+    ZERO: "JZ",
+    NOT_ZERO: "JNZ",
+    NEGATIVE: "JN",
+    POSITIVE: "JP",
+    CARRY: "JC",
+    NOT_CARRY: "JNC",
+    OVERFLOW: "JO",
+    ZERO_OR_POSITIVE: "JP",
+    ZERO_OR_NEGATIVE: "JN",
+    GTE: "JGE",
+    LT: "JLT",
+    GT: "JGT",
+    LTE: "JLE",
+    NO_INPUT: "JNIN",
+    NO_OUTPUT: "JNOUT",
+  };
+
+  const jumpInstruction = negate ? negatedConditionMap[condition] : conditionMap[condition];
+  return `${jumpInstruction} ${label}`;
 }

@@ -312,4 +312,602 @@ describe("KueParser", () => {
       expect(result.ast?.body).toHaveLength(5);
     });
   });
+
+  describe("二項演算文", () => {
+    it("should parse arithmetic addition", () => {
+      const source = `
+        var a @ 0x180
+        var b @ 0x181
+        var result @ 0x182
+        result = a + b
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("BinaryOperationStatement");
+      expect((stmt as any).destination.name).toBe("result");
+      expect((stmt as any).operator).toBe("+");
+      expect((stmt as any).left.name).toBe("a");
+      expect((stmt as any).right.name).toBe("b");
+    });
+
+    it("should parse arithmetic with carry", () => {
+      const source = `
+        var result @ 0x180
+        result = 5 +c 10
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("+c");
+      expect((stmt as any).left.value).toBe(5);
+      expect((stmt as any).right.value).toBe(10);
+    });
+
+    it("should parse subtraction", () => {
+      const source = `
+        var result @ 0x180
+        var a @ 0x181
+        result = a - 1
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("-");
+      expect((stmt as any).left.name).toBe("a");
+      expect((stmt as any).right.value).toBe(1);
+    });
+
+    it("should parse subtraction with carry", () => {
+      const source = `
+        var result @ 0x180
+        result = 10 -c 5
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("-c");
+    });
+
+    it("should parse logical AND", () => {
+      const source = `
+        var result @ 0x180
+        var a @ 0x181
+        var b @ 0x182
+        result = a & b
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("&");
+    });
+
+    it("should parse logical OR", () => {
+      const source = `
+        var result @ 0x180
+        result = 0xFF | 0x0F
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("|");
+      expect((stmt as any).left.value).toBe(0xff);
+      expect((stmt as any).right.value).toBe(0x0f);
+    });
+
+    it("should parse logical XOR", () => {
+      const source = `
+        var result @ 0x180
+        var a @ 0x181
+        result = a ^ 0xFF
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("^");
+    });
+
+    it("should parse left shift", () => {
+      const source = `
+        var result @ 0x180
+        var a @ 0x181
+        result = a << 1
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("<<");
+      expect((stmt as any).right.value).toBe(1);
+    });
+
+    it("should parse arithmetic left shift", () => {
+      const source = `
+        var result @ 0x180
+        result = 4 <<a 2
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("<<a");
+    });
+
+    it("should parse right shift", () => {
+      const source = `
+        var result @ 0x180
+        result = 8 >> 2
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe(">>");
+    });
+
+    it("should parse arithmetic right shift", () => {
+      const source = `
+        var result @ 0x180
+        var a @ 0x181
+        result = a >>a 1
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe(">>a");
+    });
+
+    it("should parse left rotate", () => {
+      const source = `
+        var result @ 0x180
+        result = 0x80 <<< 1
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("<<<");
+    });
+
+    it("should parse right rotate", () => {
+      const source = `
+        var result @ 0x180
+        var a @ 0x181
+        result = a >>> 1
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe(">>>");
+    });
+
+    it("should parse multiple binary operations", () => {
+      const source = `
+        var a @ 0x180
+        var b @ 0x181
+        var c @ 0x182
+        a = b + 1
+        b = a - 2
+        c = a & b
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(3);
+
+      expect((result.ast?.body[0] as any).operator).toBe("+");
+      expect((result.ast?.body[1] as any).operator).toBe("-");
+      expect((result.ast?.body[2] as any).operator).toBe("&");
+    });
+  });
+
+  describe("比較文", () => {
+    it("should parse equals comparison", () => {
+      const source = `
+        var a @ 0x180
+        var b @ 0x181
+        a == b
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("ComparisonStatement");
+      expect((stmt as any).operator).toBe("==");
+      expect((stmt as any).left.name).toBe("a");
+      expect((stmt as any).right.name).toBe("b");
+    });
+
+    it("should parse not equals comparison", () => {
+      const source = `
+        var a @ 0x180
+        a != 10
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("!=");
+      expect((stmt as any).left.name).toBe("a");
+      expect((stmt as any).right.value).toBe(10);
+    });
+
+    it("should parse less than comparison", () => {
+      const source = `
+        var counter @ 0x180
+        var limit @ 0x181
+        counter < limit
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("<");
+    });
+
+    it("should parse less than or equal comparison", () => {
+      const source = `5 <= 10`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe("<=");
+      expect((stmt as any).left.value).toBe(5);
+      expect((stmt as any).right.value).toBe(10);
+    });
+
+    it("should parse greater than comparison", () => {
+      const source = `10 > 5`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe(">");
+    });
+
+    it("should parse greater than or equal comparison", () => {
+      const source = `15 >= 10`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).operator).toBe(">=");
+    });
+
+    it("should parse multiple comparisons", () => {
+      const source = `
+        var a @ 0x180
+        var b @ 0x181
+        a == 0
+        b != 0
+        a < b
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(3);
+
+      expect((result.ast?.body[0] as any).operator).toBe("==");
+      expect((result.ast?.body[1] as any).operator).toBe("!=");
+      expect((result.ast?.body[2] as any).operator).toBe("<");
+    });
+  });
+
+  describe("loop文", () => {
+    it("should parse empty loop", () => {
+      const source = `loop { }`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("LoopStatement");
+      expect((stmt as any).body).toHaveLength(0);
+    });
+
+    it("should parse loop with statements", () => {
+      const source = `
+        var counter @ 0x180
+        loop {
+          counter = counter + 1
+          output
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("LoopStatement");
+      expect((stmt as any).body).toHaveLength(2);
+      expect((stmt as any).body[0].type).toBe("BinaryOperationStatement");
+      expect((stmt as any).body[1].type).toBe("BuiltinStatement");
+    });
+
+    it("should parse nested loops", () => {
+      const source = `
+        loop {
+          loop {
+            nop
+          }
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const outerLoop = result.ast?.body[0];
+      expect(outerLoop?.type).toBe("LoopStatement");
+      expect((outerLoop as any).body).toHaveLength(1);
+      expect((outerLoop as any).body[0].type).toBe("LoopStatement");
+    });
+  });
+
+  describe("if文", () => {
+    it("should parse if with ZERO condition", () => {
+      const source = `
+        if ZERO {
+          halt
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("IfStatement");
+      expect((stmt as any).condition).toBe("ZERO");
+      expect((stmt as any).body).toHaveLength(1);
+    });
+
+    it("should parse if with NOT_ZERO condition", () => {
+      const source = `if NOT_ZERO { nop }`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).condition).toBe("NOT_ZERO");
+    });
+
+    it("should parse if with NEGATIVE condition", () => {
+      const source = `if NEGATIVE { output }`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).condition).toBe("NEGATIVE");
+    });
+
+    it("should parse if with CARRY condition", () => {
+      const source = `if CARRY { set_carry_flag }`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).condition).toBe("CARRY");
+    });
+
+    it("should parse if with complex body", () => {
+      const source = `
+        var a @ 0x180
+        if ZERO {
+          a = 10
+          output
+          halt
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("IfStatement");
+      expect((stmt as any).body).toHaveLength(3);
+    });
+
+    it("should parse nested if statements", () => {
+      const source = `
+        if ZERO {
+          if NOT_ZERO {
+            halt
+          }
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const outerIf = result.ast?.body[0];
+      expect(outerIf?.type).toBe("IfStatement");
+      expect((outerIf as any).body[0].type).toBe("IfStatement");
+    });
+  });
+
+  describe("break/continue文", () => {
+    it("should parse break statement", () => {
+      const source = `
+        loop {
+          break
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const loop = result.ast?.body[0];
+      expect((loop as any).body[0].type).toBe("BreakStatement");
+    });
+
+    it("should parse continue statement", () => {
+      const source = `
+        loop {
+          continue
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const loop = result.ast?.body[0];
+      expect((loop as any).body[0].type).toBe("ContinueStatement");
+    });
+
+    it("should parse loop with break and continue", () => {
+      const source = `
+        var counter @ 0x180
+        loop {
+          counter = counter + 1
+          if ZERO {
+            break
+          }
+          if NEGATIVE {
+            continue
+          }
+          output
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const loop = result.ast?.body[0];
+      expect((loop as any).body).toHaveLength(4);
+      expect((loop as any).body[1].body[0].type).toBe("BreakStatement");
+      expect((loop as any).body[2].body[0].type).toBe("ContinueStatement");
+    });
+  });
+
+  describe("複雑な制御フロー", () => {
+    it("should parse complex control flow program", () => {
+      const source = `
+        var counter @ 0x180
+        var limit @ 0x181
+
+        counter = 0
+        limit = 10
+
+        loop {
+          counter < limit
+          if ZERO_OR_POSITIVE {
+            counter = counter + 1
+            output
+          }
+          if NOT_ZERO {
+            break
+          }
+        }
+        halt
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.variables).toHaveLength(2);
+      expect(result.ast?.body).toHaveLength(4); // 2 assignments, 1 loop, 1 halt
+    });
+  });
 });

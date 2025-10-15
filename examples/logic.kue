@@ -1,0 +1,27 @@
+// 論理演算のサンプルプログラム
+// AND, OR, XOR演算を実演
+
+var mask @ 0x180
+var data @ 0x181
+var result_and @ 0x182
+var result_or @ 0x183
+var result_xor @ 0x184
+
+// マスクとデータを設定
+mask = 0x0F
+data = 0xF0
+
+// AND演算: result_and = mask & data
+result_and = mask & data
+
+// OR演算: result_or = mask | data
+result_or = mask | data
+
+// XOR演算: result_xor = mask ^ data
+result_xor = mask ^ data
+
+// ビット反転のデモ（XOR with 0xFF）
+result_xor = data ^ 0xFF
+
+// 終了
+halt

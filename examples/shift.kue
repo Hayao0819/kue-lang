@@ -1,0 +1,34 @@
+// シフトとローテート演算のサンプルプログラム
+// 各種シフト・ローテート命令を実演
+
+var value @ 0x180
+var left_shift @ 0x181
+var right_shift @ 0x182
+var left_rotate @ 0x183
+var right_rotate @ 0x184
+var arith_shift @ 0x185
+
+// 初期値を設定
+value = 0x80
+
+// 論理左シフト: left_shift = value << 1
+left_shift = value << 1
+
+// 論理右シフト: right_shift = value >> 1
+right_shift = value >> 1
+
+// 左ローテート: left_rotate = value <<< 1
+left_rotate = value <<< 1
+
+// 右ローテート: right_rotate = value >>> 1
+right_rotate = value >>> 1
+
+// 算術左シフト: arith_shift = value <<a 1
+arith_shift = value <<a 1
+
+// 負数での算術右シフト（符号拡張）
+value = 0xFF
+arith_shift = value >>a 1
+
+// 終了
+halt
