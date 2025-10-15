@@ -1,0 +1,33 @@
+// レジスタ直接操作のサンプル
+// ACC、IXレジスタを直接操作できます
+
+var counter @ 0x180
+var limit @ 0x181
+var result @ 0x182
+
+// 初期化
+counter = 0
+limit = 10
+
+// レジスタを使った効率的な計算
+// ACC = ACC + 1 の形式で直接レジスタを操作すると、
+// メモリアクセスが減り、コードが短くなります
+loop {
+    // カウンタをインクリメント（レジスタ操作版）
+    ACC = counter
+    ACC = ACC + 1
+    counter = ACC
+
+    // 比較（counterとlimitを比較）
+    counter == limit
+    if ZERO {
+        break
+    }
+}
+
+// ACCとIXの相互代入の例
+ACC = counter  // counterをACCにロード
+IX = ACC       // ACCからIXにコピー
+result = IX    // IXをresultに保存
+
+halt

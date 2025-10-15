@@ -132,7 +132,23 @@ export class KueAstBuilder extends BaseCstVisitor {
    * 左辺値を訪問
    */
   lvalue(ctx: LValueCst["children"]): LValue {
-    const token = ctx.Identifier[0];
+    // レジスタチェック
+    if (ctx.ACC?.[0]) {
+      return {
+        type: "Register",
+        name: "ACC",
+        location: this.getLocation(ctx.ACC[0]),
+      };
+    }
+    if (ctx.IX?.[0]) {
+      return {
+        type: "Register",
+        name: "IX",
+        location: this.getLocation(ctx.IX[0]),
+      };
+    }
+
+    const token = ctx.Identifier?.[0];
     if (!token) {
       throw new Error("Missing identifier in lvalue");
     }
@@ -163,6 +179,22 @@ export class KueAstBuilder extends BaseCstVisitor {
    * 右辺値を訪問
    */
   rvalue(ctx: RValueCst["children"]): RValue {
+    // レジスタチェック
+    if (ctx.ACC?.[0]) {
+      return {
+        type: "Register",
+        name: "ACC",
+        location: this.getLocation(ctx.ACC[0]),
+      };
+    }
+    if (ctx.IX?.[0]) {
+      return {
+        type: "Register",
+        name: "IX",
+        location: this.getLocation(ctx.IX[0]),
+      };
+    }
+
     if (ctx.Identifier) {
       const token = ctx.Identifier[0];
       if (!token) {
@@ -284,6 +316,22 @@ export class KueAstBuilder extends BaseCstVisitor {
    * オペランドを訪問
    */
   operand(ctx: OperandCst["children"]): Operand {
+    // レジスタチェック
+    if (ctx.ACC?.[0]) {
+      return {
+        type: "Register",
+        name: "ACC",
+        location: this.getLocation(ctx.ACC[0]),
+      };
+    }
+    if (ctx.IX?.[0]) {
+      return {
+        type: "Register",
+        name: "IX",
+        location: this.getLocation(ctx.IX[0]),
+      };
+    }
+
     if (ctx.Identifier) {
       const token = ctx.Identifier[0];
       if (!token) {

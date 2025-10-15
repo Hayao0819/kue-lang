@@ -64,7 +64,9 @@ export interface AssignmentStatementCst extends CstNode {
 export interface LValueCst extends CstNode {
   name: "lvalue";
   children: {
-    Identifier: IToken[];
+    Identifier?: IToken[];
+    ACC?: IToken[];
+    IX?: IToken[];
     LBracket?: IToken[];
     indexExpression?: IndexExpressionCst[];
     RBracket?: IToken[];
@@ -78,6 +80,8 @@ export interface RValueCst extends CstNode {
   name: "rvalue";
   children: {
     Identifier?: IToken[];
+    ACC?: IToken[];
+    IX?: IToken[];
     LBracket?: IToken[];
     indexExpression?: IndexExpressionCst[];
     RBracket?: IToken[];
@@ -150,6 +154,8 @@ export interface OperandCst extends CstNode {
   name: "operand";
   children: {
     Identifier?: IToken[];
+    ACC?: IToken[];
+    IX?: IToken[];
     LBracket?: IToken[];
     indexExpression?: IndexExpressionCst[];
     RBracket?: IToken[];

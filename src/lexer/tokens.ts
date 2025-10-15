@@ -45,6 +45,13 @@ export const ResetCarryFlag = createToken({
 });
 
 // ========================================
+// レジスタ
+// ========================================
+
+export const ACC = createToken({ name: "ACC", pattern: /ACC\b/, longer_alt: Identifier });
+export const IX = createToken({ name: "IX", pattern: /IX\b/, longer_alt: Identifier });
+
+// ========================================
 // フラグ条件
 // ========================================
 
@@ -209,6 +216,10 @@ export const allTokens = [
   Output,
   SetCarryFlag,
   ResetCarryFlag,
+
+  // レジスタ
+  ACC,
+  IX,
 
   // フラグ条件（長いものから順に）
   ZeroOrPositive,

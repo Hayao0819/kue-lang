@@ -438,7 +438,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toContain("LD ACC, (181H)");
-      expect(code).toContain("SLL ACC, 1");
+      expect(code).toContain("SLL ACC");
     });
 
     it("should generate code for arithmetic left shift", () => {
@@ -452,7 +452,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toContain("LD ACC, 4");
-      expect(code).toContain("SLA ACC, 2");
+      expect(code).toContain("SLA ACC");
     });
 
     it("should generate code for right shift", () => {
@@ -466,7 +466,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toContain("LD ACC, 8");
-      expect(code).toContain("SRL ACC, 2");
+      expect(code).toContain("SRL ACC");
     });
 
     it("should generate code for arithmetic right shift", () => {
@@ -481,7 +481,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toContain("LD ACC, (181H)");
-      expect(code).toContain("SRA ACC, 1");
+      expect(code).toContain("SRA ACC");
     });
 
     it("should generate code for left rotate", () => {
@@ -495,7 +495,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toContain("LD ACC, 128");
-      expect(code).toContain("RLL ACC, 1");
+      expect(code).toContain("RLL ACC");
     });
 
     it("should generate code for right rotate", () => {
@@ -510,7 +510,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toContain("LD ACC, (181H)");
-      expect(code).toContain("RRL ACC, 1");
+      expect(code).toContain("RRL ACC");
     });
 
     it("should generate code for multiple binary operations", () => {
@@ -612,7 +612,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toMatch(/LOOP_START_\d+:/);
-      expect(code).toMatch(/JMP LOOP_START_\d+/);
+      expect(code).toMatch(/BA LOOP_START_\d+/);
       expect(code).toMatch(/LOOP_END_\d+:/);
     });
 
@@ -633,7 +633,7 @@ HLT`;
       expect(code).toContain("LD ACC, (180H)");
       expect(code).toContain("ADD ACC, 1");
       expect(code).toContain("OUT");
-      expect(code).toMatch(/JMP LOOP_START_\d+/);
+      expect(code).toMatch(/BA LOOP_START_\d+/);
       expect(code).toMatch(/LOOP_END_\d+:/);
     });
 
@@ -671,7 +671,7 @@ HLT`;
       expect(result.ast).not.toBeNull();
 
       const code = generateCode(result.ast!);
-      expect(code).toMatch(/JNZ END_IF_\d+/);
+      expect(code).toMatch(/BNZ END_IF_\d+/);
       expect(code).toContain("HLT");
       expect(code).toMatch(/END_IF_\d+:/);
     });
@@ -683,7 +683,7 @@ HLT`;
       expect(result.ast).not.toBeNull();
 
       const code = generateCode(result.ast!);
-      expect(code).toMatch(/JZ END_IF_\d+/);
+      expect(code).toMatch(/BZ END_IF_\d+/);
       expect(code).toContain("OUT");
     });
 
@@ -694,7 +694,7 @@ HLT`;
       expect(result.ast).not.toBeNull();
 
       const code = generateCode(result.ast!);
-      expect(code).toMatch(/JP END_IF_\d+/);
+      expect(code).toMatch(/BP END_IF_\d+/);
       expect(code).toContain("NOP");
     });
 
@@ -712,7 +712,7 @@ HLT`;
       expect(result.ast).not.toBeNull();
 
       const code = generateCode(result.ast!);
-      expect(code).toMatch(/JNC END_IF_\d+/);
+      expect(code).toMatch(/BNC END_IF_\d+/);
       expect(code).toContain("LD ACC, 10");
       expect(code).toContain("ST ACC, (180H)");
       expect(code).toContain("OUT");
@@ -734,7 +734,7 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toMatch(/LOOP_START_\d+:/);
-      expect(code).toMatch(/JMP LOOP_END_\d+/);
+      expect(code).toMatch(/BA LOOP_END_\d+/);
       expect(code).toMatch(/LOOP_END_\d+:/);
     });
 
@@ -750,9 +750,9 @@ HLT`;
 
       const code = generateCode(result.ast!);
       expect(code).toMatch(/LOOP_START_\d+:/);
-      // Should have JMP LOOP_START twice (continue + loop end)
-      const jmpMatches = code.match(/JMP LOOP_START_\d+/g);
-      expect(jmpMatches).toHaveLength(2);
+      // Should have BA LOOP_START twice (continue + loop end)
+      const baMatches = code.match(/BA LOOP_START_\d+/g);
+      expect(baMatches).toHaveLength(2);
     });
 
     it("should throw error for break outside loop", () => {
@@ -795,8 +795,8 @@ HLT`;
       expect(code).toMatch(/LOOP_START_\d+:/);
       expect(code).toContain("ADD ACC, 1");
       expect(code).toContain("CMP ACC, 10");
-      expect(code).toMatch(/JNZ END_IF_\d+/);
-      expect(code).toMatch(/JMP LOOP_END_\d+/); // break
+      expect(code).toMatch(/BNZ END_IF_\d+/);
+      expect(code).toMatch(/BA LOOP_END_\d+/); // break
       expect(code).toMatch(/END_IF_\d+:/);
       expect(code).toContain("OUT");
       expect(code).toMatch(/LOOP_END_\d+:/);
@@ -825,7 +825,7 @@ HLT`;
       const loopEndMatches = code.match(/LOOP_END_\d+:/g);
       expect(loopEndMatches).toHaveLength(2);
       // Should have an if statement
-      expect(code).toMatch(/JNZ END_IF_\d+/);
+      expect(code).toMatch(/BNZ END_IF_\d+/);
       expect(code).toMatch(/END_IF_\d+:/);
     });
 

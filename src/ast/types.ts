@@ -128,13 +128,13 @@ export interface AsmBlock {
 // ========================================
 
 // 左辺値（代入先）
-export type LValue = Variable | ArrayAccess;
+export type LValue = Variable | ArrayAccess | Register;
 
 // 右辺値（代入元）
-export type RValue = Variable | ArrayAccess | Literal;
+export type RValue = Variable | ArrayAccess | Literal | Register;
 
 // オペランド（演算子の引数）
-export type Operand = Variable | ArrayAccess | Literal;
+export type Operand = Variable | ArrayAccess | Literal | Register;
 
 // 変数
 export interface Variable {
@@ -148,6 +148,13 @@ export interface ArrayAccess {
   type: "ArrayAccess";
   array: string;
   index: Variable | Literal;
+  location?: SourceLocation;
+}
+
+// レジスタ
+export interface Register {
+  type: "Register";
+  name: "ACC" | "IX";
   location?: SourceLocation;
 }
 

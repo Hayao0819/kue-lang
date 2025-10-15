@@ -164,10 +164,32 @@ function generateStatement(statement: Statement, context: CodeGenContext): strin
  *                ST ACC, (80H)
  * foo = bar   → LD ACC, (81H)
  *                ST ACC, (80H)
+ * ACC = ACC + foo → LD ACC, (180H)
+ *                   ADD ACC, (180H)
+ *                   (ストア不要)
+ * IX = IX + 1 → LD IX, 1
+ *               ADD IX, 1
+ *               (ストア不要)
  * foo[i] = bar[j]  → 両方が変数添字配列の場合は特別処理
  */
 function generateAssignment(statement: AssignmentStatement, symbolTable: Map<string, number>): string {
   const lines: string[] = [];
+
+  // 特殊ケース: レジスタからレジスタへの直接代入
+  // IX = ACC または ACC = IX
+  if (statement.left.type === "Register" && statement.right.type === "Register") {
+    if (statement.left.name === statement.right.name) {
+      // 同じレジスタ同士の代入は無操作
+      return `* ${statement.left.name} = ${statement.right.name} (no operation)`;
+    }
+    // 異なるレジスタ間の代入
+    if (statement.left.name === "ACC" && statement.right.name === "IX") {
+      return `LD ACC, IX`;
+    }
+    if (statement.left.name === "IX" && statement.right.name === "ACC") {
+      return `LD IX, ACC`;
+    }
+  }
 
   // 特殊ケース: 両方が変数添字の配列アクセスの場合
   // foo[i] = bar[j]  →  LD IX, (jのアドレス)
@@ -198,11 +220,20 @@ function generateAssignment(statement: AssignmentStatement, symbolTable: Map<str
   // 通常ケース
   // 右辺値をアキュムレータにロード
   const loadInstr = generateLoad(statement.right, symbolTable);
-  lines.push(loadInstr);
+  if (loadInstr && !loadInstr.startsWith("*")) {
+    lines.push(loadInstr);
+  }
 
   // 左辺値にストア
   const storeInstr = generateStore(statement.left, symbolTable);
-  lines.push(storeInstr);
+  if (storeInstr && !storeInstr.startsWith("*")) {
+    lines.push(storeInstr);
+  }
+
+  // コメントのみの場合は無操作として出力
+  if (lines.length === 0) {
+    return `* ${statement.left.type === "Register" ? statement.left.name : "variable"} = ${statement.right.type === "Register" ? statement.right.name : "value"} (no operation)`;
+  }
 
   return lines.join("\n");
 }
@@ -221,6 +252,13 @@ function generateLoad(rvalue: RValue, symbolTable: Map<string, number>): string 
   } else if (rvalue.type === "ArrayAccess") {
     // 配列アクセス: array[index]
     return generateArrayLoad(rvalue, symbolTable);
+  } else if (rvalue.type === "Register") {
+    // レジスタ: LD ACC, IX または LD ACC, ACC（無操作）
+    if (rvalue.name === "IX") {
+      return `LD ACC, IX`;
+    }
+    // ACC = ACC は無操作だが、コメントとして出力
+    return `* ACC = ACC (no operation)`;
   }
   const _exhaustive: never = rvalue;
   return _exhaustive;
@@ -237,6 +275,13 @@ function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string
   } else if (lvalue.type === "ArrayAccess") {
     // 配列アクセス: array[index]
     return generateArrayStore(lvalue, symbolTable);
+  } else if (lvalue.type === "Register") {
+    // レジスタ: ST ACC, IX または ST ACC, ACC（無操作）
+    if (lvalue.name === "IX") {
+      return `ST ACC, IX`;
+    }
+    // ACC = ACC は無操作だが、コメントとして出力
+    return `* ACC = ACC (no operation)`;
   }
   const _exhaustive: never = lvalue;
   return _exhaustive;
@@ -247,13 +292,17 @@ function generateStore(lvalue: LValue, symbolTable: Map<string, number>): string
  * result = foo + bar  →  LD ACC, (180H)
  *                        ADD ACC, (181H)
  *                        ST ACC, (182H)
+ * ACC = ACC + 1      →  ADD ACC, 1
+ *                        (ロード・ストア不要)
  */
 function generateBinaryOperation(statement: BinaryOperationStatement, symbolTable: Map<string, number>): string {
   const lines: string[] = [];
 
   // 左オペランドをアキュムレータにロード
   const loadInstr = generateOperandLoad(statement.left, symbolTable);
-  lines.push(loadInstr);
+  if (loadInstr && !loadInstr.startsWith("*")) {
+    lines.push(loadInstr);
+  }
 
   // 演算命令を生成
   const opInstr = generateBinaryOperationInstruction(statement.operator, statement.right, symbolTable);
@@ -261,7 +310,9 @@ function generateBinaryOperation(statement: BinaryOperationStatement, symbolTabl
 
   // 結果をデスティネーションにストア
   const storeInstr = generateStore(statement.destination, symbolTable);
-  lines.push(storeInstr);
+  if (storeInstr && !storeInstr.startsWith("*")) {
+    lines.push(storeInstr);
+  }
 
   return lines.join("\n");
 }
@@ -280,6 +331,13 @@ function generateOperandLoad(operand: Operand, symbolTable: Map<string, number>)
   } else if (operand.type === "ArrayAccess") {
     // 配列アクセス: array[index]
     return generateArrayLoad(operand, symbolTable);
+  } else if (operand.type === "Register") {
+    // レジスタ: LD ACC, IX または LD ACC, ACC（無操作）
+    if (operand.name === "IX") {
+      return `LD ACC, IX`;
+    }
+    // ACC = ACC は無操作だが、コメントとして出力
+    return `* ACC = ACC (no operation)`;
   }
   const _exhaustive: never = operand;
   return _exhaustive;
@@ -314,20 +372,20 @@ function generateBinaryOperationInstruction(
       return `OR ACC, ${rightOperandStr}`;
     case "^":
       return `EOR ACC, ${rightOperandStr}`;
-    // シフト演算
+    // シフト演算（オペランドなし、常に1ビットシフト）
     case "<<":
-      return `SLL ACC, ${rightOperandStr}`;
+      return `SLL ACC`;
     case "<<a":
-      return `SLA ACC, ${rightOperandStr}`;
+      return `SLA ACC`;
     case ">>":
-      return `SRL ACC, ${rightOperandStr}`;
+      return `SRL ACC`;
     case ">>a":
-      return `SRA ACC, ${rightOperandStr}`;
-    // ローテート演算
+      return `SRA ACC`;
+    // ローテート演算（オペランドなし、常に1ビット）
     case "<<<":
-      return `RLL ACC, ${rightOperandStr}`;
+      return `RLL ACC`;
     case ">>>":
-      return `RRL ACC, ${rightOperandStr}`;
+      return `RRL ACC`;
     default:
       throw new Error(`Unknown binary operator: ${operator}`);
   }
@@ -351,6 +409,9 @@ function formatOperand(operand: Operand, symbolTable: Map<string, number>): stri
       return formatDataAddress(finalAddr);
     }
     throw new Error("Variable index array access cannot be formatted as operand string");
+  } else if (operand.type === "Register") {
+    // レジスタをオペランドとして直接使用
+    return operand.name;
   }
   const _exhaustive: never = operand;
   return _exhaustive;
@@ -437,7 +498,7 @@ function generateLoop(statement: LoopStatement, context: CodeGenContext): string
   }
 
   // ループの先頭に戻る
-  lines.push(`JMP ${startLabel}`);
+  lines.push(`BA ${startLabel}`);
 
   // ループ終了ラベル
   lines.push(`${endLabel}:`);
@@ -488,7 +549,7 @@ function generateBreak(context: CodeGenContext): string {
   if (!currentLoop) {
     throw new Error("break statement outside of loop");
   }
-  return `JMP ${currentLoop.endLabel}`;
+  return `BA ${currentLoop.endLabel}`;
 }
 
 /**
@@ -503,7 +564,7 @@ function generateContinue(context: CodeGenContext): string {
   if (!currentLoop) {
     throw new Error("continue statement outside of loop");
   }
-  return `JMP ${currentLoop.startLabel}`;
+  return `BA ${currentLoop.startLabel}`;
 }
 
 /**
@@ -515,40 +576,40 @@ function generateContinue(context: CodeGenContext): string {
 function generateConditionalJump(condition: FlagCondition, label: string, negate: boolean): string {
   // 条件を反転する場合のマッピング
   const negatedConditionMap: Record<FlagCondition, string> = {
-    ZERO: "JNZ",
-    NOT_ZERO: "JZ",
-    NEGATIVE: "JP",
-    POSITIVE: "JN",
-    CARRY: "JNC",
-    NOT_CARRY: "JC",
-    OVERFLOW: "JNO",
-    ZERO_OR_POSITIVE: "JN",
-    ZERO_OR_NEGATIVE: "JP",
-    GTE: "JLT",
-    LT: "JGE",
-    GT: "JLE",
-    LTE: "JGT",
-    NO_INPUT: "JIN",
-    NO_OUTPUT: "JOUT",
+    ZERO: "BNZ",
+    NOT_ZERO: "BZ",
+    NEGATIVE: "BP",
+    POSITIVE: "BN",
+    CARRY: "BNC",
+    NOT_CARRY: "BC",
+    OVERFLOW: "BNO",
+    ZERO_OR_POSITIVE: "BN",
+    ZERO_OR_NEGATIVE: "BP",
+    GTE: "BLT",
+    LT: "BGE",
+    GT: "BLE",
+    LTE: "BGT",
+    NO_INPUT: "BIN",
+    NO_OUTPUT: "BOUT",
   };
 
   // 条件をそのまま使う場合のマッピング
   const conditionMap: Record<FlagCondition, string> = {
-    ZERO: "JZ",
-    NOT_ZERO: "JNZ",
-    NEGATIVE: "JN",
-    POSITIVE: "JP",
-    CARRY: "JC",
-    NOT_CARRY: "JNC",
-    OVERFLOW: "JO",
-    ZERO_OR_POSITIVE: "JP",
-    ZERO_OR_NEGATIVE: "JN",
-    GTE: "JGE",
-    LT: "JLT",
-    GT: "JGT",
-    LTE: "JLE",
-    NO_INPUT: "JNIN",
-    NO_OUTPUT: "JNOUT",
+    ZERO: "BZ",
+    NOT_ZERO: "BNZ",
+    NEGATIVE: "BN",
+    POSITIVE: "BP",
+    CARRY: "BC",
+    NOT_CARRY: "BNC",
+    OVERFLOW: "BO",
+    ZERO_OR_POSITIVE: "BP",
+    ZERO_OR_NEGATIVE: "BN",
+    GTE: "BGE",
+    LT: "BLT",
+    GT: "BGT",
+    LTE: "BLE",
+    NO_INPUT: "BNIN",
+    NO_OUTPUT: "BNOUT",
   };
 
   const jumpInstruction = negate ? negatedConditionMap[condition] : conditionMap[condition];

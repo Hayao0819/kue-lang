@@ -1,5 +1,6 @@
 import { CstParser } from "chevrotain";
 import {
+  ACC,
   And,
   Assign,
   At,
@@ -18,6 +19,7 @@ import {
   Identifier,
   If,
   Input,
+  IX,
   LBrace,
   LBracket,
   LeftRotate,
@@ -158,11 +160,11 @@ export class KueParser extends CstParser {
         // 配列アクセスを考慮して二項演算子を探す
         GATE: () => {
           const token1 = this.LA(1);
-          if (token1.tokenType !== Identifier) {
+          if (token1.tokenType !== Identifier && token1.tokenType !== ACC && token1.tokenType !== IX) {
             return false;
           }
 
-          // lvalue (identifier または identifier[index]) をスキップ
+          // lvalue (identifier, register, または identifier[index]) をスキップ
           let pos = 2;
           const token2 = this.LA(pos);
           // 配列アクセスの場合は ] まで進む
@@ -184,7 +186,7 @@ export class KueParser extends CstParser {
           }
           pos++;
 
-          // 最初のオペランド (identifier, identifier[index], literal) をスキップ
+          // 最初のオペランド (identifier, register, identifier[index], literal) をスキップ
           const operandToken = this.LA(pos);
           if (operandToken.tokenType === Identifier) {
             pos++;
@@ -198,6 +200,8 @@ export class KueParser extends CstParser {
               }
             }
           } else if (operandToken.tokenType === HexLiteral || operandToken.tokenType === DecimalLiteral) {
+            pos++;
+          } else if (operandToken.tokenType === ACC || operandToken.tokenType === IX) {
             pos++;
           } else {
             return false;
@@ -260,21 +264,29 @@ export class KueParser extends CstParser {
   /**
    * 左辺値 (lvalue)
    *
-   * identifier | identifier[index]
+   * identifier | identifier[index] | register
    */
   private lvalue = this.RULE("lvalue", () => {
-    this.CONSUME(Identifier);
-    this.OPTION(() => {
-      this.CONSUME(LBracket);
-      this.SUBRULE(this.indexExpression);
-      this.CONSUME(RBracket);
-    });
+    this.OR([
+      {
+        ALT: () => {
+          this.CONSUME(Identifier);
+          this.OPTION(() => {
+            this.CONSUME(LBracket);
+            this.SUBRULE(this.indexExpression);
+            this.CONSUME(RBracket);
+          });
+        },
+      },
+      { ALT: () => this.CONSUME(ACC) },
+      { ALT: () => this.CONSUME(IX) },
+    ]);
   });
 
   /**
    * 右辺値 (rvalue)
    *
-   * identifier | identifier[index] | literal
+   * identifier | identifier[index] | literal | register
    */
   private rvalue = this.RULE("rvalue", () => {
     this.OR([
@@ -289,6 +301,8 @@ export class KueParser extends CstParser {
         },
       },
       { ALT: () => this.SUBRULE(this.literal) },
+      { ALT: () => this.CONSUME(ACC) },
+      { ALT: () => this.CONSUME(IX) },
     ]);
   });
 
@@ -350,7 +364,7 @@ export class KueParser extends CstParser {
   /**
    * オペランド
    *
-   * identifier | identifier[index] | literal
+   * identifier | identifier[index] | literal | register
    */
   private operand = this.RULE("operand", () => {
     this.OR([
@@ -365,6 +379,8 @@ export class KueParser extends CstParser {
         },
       },
       { ALT: () => this.SUBRULE(this.literal) },
+      { ALT: () => this.CONSUME(ACC) },
+      { ALT: () => this.CONSUME(IX) },
     ]);
   });
 
