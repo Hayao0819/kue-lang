@@ -1,0 +1,18 @@
+// Simple program: Initialize variables and halt
+// This demonstrates basic variable declarations and assignments
+
+var counter @ 0x180
+var limit @ 0x181
+var result @ 0x182
+
+// Initialize counter to 0
+counter = 0
+
+// Set limit to 10
+limit = 10
+
+// Copy counter to result
+result = counter
+
+// Halt the program
+halt

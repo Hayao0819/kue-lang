@@ -1,0 +1,17 @@
+// Input/Output program
+// Demonstrates input, output, and builtin instructions
+
+var input_value @ 0x180
+var output_value @ 0x181
+
+// Read input
+input
+
+// Initialize output value
+output_value = 42
+
+// Write output
+output
+
+// Halt
+halt
