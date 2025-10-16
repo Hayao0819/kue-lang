@@ -10,6 +10,7 @@ import {
   Continue,
   DecimalLiteral,
   Equals,
+  Exclamation,
   GreaterThan,
   GreaterThanOrEqual,
   Gt,
@@ -30,6 +31,7 @@ import {
   Loop,
   Lt,
   Lte,
+  Macro,
   Minus,
   MinusWithCarry,
   Negative,
@@ -96,12 +98,14 @@ export class KueParser extends CstParser {
   /**
    * 文
    *
-   * statement := loop | if | break | continue | comparison | binary_operation | assignment | builtin
+   * statement := macro_decl | loop | if | break | continue | comparison | binary_operation | assignment | builtin | macro_call
    *
    * Note: 各文の形式を区別するためにlookaheadを使用しています。
    */
   private statement = this.RULE("statement", () => {
     return this.OR([
+      // マクロ宣言
+      { ALT: () => this.SUBRULE(this.macroDeclaration) },
       // loop文
       { ALT: () => this.SUBRULE(this.loopStatement) },
       // if文
@@ -230,6 +234,15 @@ export class KueParser extends CstParser {
       {
         // 代入文: identifier = rvalue
         ALT: () => this.SUBRULE(this.assignmentStatement),
+      },
+      {
+        // マクロ呼び出し: identifier!
+        GATE: () => {
+          const token1 = this.LA(1);
+          const token2 = this.LA(2);
+          return token1.tokenType === Identifier && token2.tokenType === Exclamation;
+        },
+        ALT: () => this.SUBRULE(this.macroCallStatement),
       },
       {
         // 組み込み命令
@@ -489,6 +502,31 @@ export class KueParser extends CstParser {
       { ALT: () => this.CONSUME(SetCarryFlag) },
       { ALT: () => this.CONSUME(ResetCarryFlag) },
     ]);
+  });
+
+  /**
+   * マクロ宣言
+   *
+   * macro identifier { statements }
+   */
+  private macroDeclaration = this.RULE("macroDeclaration", () => {
+    this.CONSUME(Macro);
+    this.CONSUME(Identifier);
+    this.CONSUME(LBrace);
+    this.MANY(() => {
+      this.SUBRULE(this.statement);
+    });
+    this.CONSUME(RBrace);
+  });
+
+  /**
+   * マクロ呼び出し
+   *
+   * identifier!
+   */
+  private macroCallStatement = this.RULE("macroCallStatement", () => {
+    this.CONSUME(Identifier);
+    this.CONSUME(Exclamation);
   });
 }
 

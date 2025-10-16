@@ -1,0 +1,38 @@
+// マクロ機能のデモプログラム
+// 仕様書のサンプルに基づいた例
+
+var counter @ 0x180
+var limit @ 0x181
+
+// 初期化マクロ
+macro init {
+  counter = 0
+  limit = 10
+}
+
+// 出力マクロ
+macro print {
+  output
+}
+
+// カウンタをインクリメントするマクロ
+macro increment_counter {
+  counter = counter + 1
+}
+
+// 初期化を実行
+init!
+
+// メインループ
+loop {
+  print!
+  increment_counter!
+
+  // カウンタが制限に達したかチェック
+  counter == limit
+  if ZERO {
+    break
+  }
+}
+
+halt

@@ -1068,4 +1068,120 @@ describe("KueParser", () => {
       expect((stmt as any).right.index.value).toBe(0x0a);
     });
   });
+
+  describe("マクロ", () => {
+    it("should parse macro declaration", () => {
+      const source = `
+        macro init {
+          halt
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+
+      const stmt = result.ast?.body[0];
+      expect(stmt?.type).toBe("MacroDeclaration");
+      expect((stmt as any).name).toBe("init");
+      expect((stmt as any).body).toHaveLength(1);
+      expect((stmt as any).body[0].type).toBe("BuiltinStatement");
+    });
+
+    it("should parse empty macro", () => {
+      const source = `macro empty { }`;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).name).toBe("empty");
+      expect((stmt as any).body).toHaveLength(0);
+    });
+
+    it("should parse macro with multiple statements", () => {
+      const source = `
+        var counter @ 0x180
+        macro increment {
+          counter = counter + 1
+          output
+          nop
+        }
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+
+      const stmt = result.ast?.body[0];
+      expect((stmt as any).body).toHaveLength(3);
+    });
+
+    it("should parse macro call", () => {
+      const source = `
+        macro test {
+          halt
+        }
+        test!
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(2);
+
+      const macroCall = result.ast?.body[1];
+      expect(macroCall?.type).toBe("MacroCallStatement");
+      expect((macroCall as any).name).toBe("test");
+    });
+
+    it("should parse nested macro calls", () => {
+      const source = `
+        macro inner {
+          nop
+        }
+        macro outer {
+          inner!
+        }
+        outer!
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(3);
+
+      const outerMacro = result.ast?.body[1];
+      expect((outerMacro as any).body[0].type).toBe("MacroCallStatement");
+    });
+
+    it("should parse program with macros and regular statements", () => {
+      const source = `
+        var counter @ 0x180
+
+        macro inc {
+          counter = counter + 1
+        }
+
+        counter = 0
+        inc!
+        inc!
+        halt
+      `;
+
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.variables).toHaveLength(1);
+      expect(result.ast?.body).toHaveLength(5); // macro decl, assignment, 2 macro calls, halt
+    });
+  });
 });

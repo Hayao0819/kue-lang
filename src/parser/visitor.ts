@@ -14,6 +14,8 @@ import type {
   Literal,
   LoopStatement,
   LValue,
+  MacroCallStatement,
+  MacroDeclaration,
   Operand,
   Program,
   RValue,
@@ -36,6 +38,8 @@ import type {
   LiteralCst,
   LoopStatementCst,
   LValueCst,
+  MacroCallStatementCst,
+  MacroDeclarationCst,
   OperandCst,
   ProgramCst,
   RValueCst,
@@ -87,6 +91,9 @@ export class KueAstBuilder extends BaseCstVisitor {
    * 文を訪問
    */
   statement(ctx: StatementCst["children"]): Statement {
+    if (ctx.macroDeclaration) {
+      return this.visit(ctx.macroDeclaration) as MacroDeclaration;
+    }
     if (ctx.loopStatement) {
       return this.visit(ctx.loopStatement) as LoopStatement;
     }
@@ -107,6 +114,9 @@ export class KueAstBuilder extends BaseCstVisitor {
     }
     if (ctx.assignmentStatement) {
       return this.visit(ctx.assignmentStatement) as AssignmentStatement;
+    }
+    if (ctx.macroCallStatement) {
+      return this.visit(ctx.macroCallStatement) as MacroCallStatement;
     }
     if (ctx.builtinStatement) {
       return this.visit(ctx.builtinStatement) as BuiltinStatement;
@@ -559,6 +569,52 @@ export class KueAstBuilder extends BaseCstVisitor {
     if (ctx.NoInput?.[0]) return "NO_INPUT";
     if (ctx.NoOutput?.[0]) return "NO_OUTPUT";
     throw new Error("Unknown flag condition");
+  }
+
+  /**
+   * マクロ宣言を訪問
+   */
+  macroDeclaration(ctx: MacroDeclarationCst["children"]): MacroDeclaration {
+    const macroToken = ctx.Macro[0];
+    if (!macroToken) {
+      throw new Error("Missing macro token");
+    }
+
+    const nameToken = ctx.Identifier[0];
+    if (!nameToken) {
+      throw new Error("Missing identifier in macro declaration");
+    }
+
+    const body: Statement[] = [];
+    if (ctx.statement) {
+      for (const stmtCst of ctx.statement) {
+        const stmt = this.visit(stmtCst) as Statement;
+        body.push(stmt);
+      }
+    }
+
+    return {
+      type: "MacroDeclaration",
+      name: nameToken.image,
+      body,
+      location: this.getLocation(macroToken),
+    };
+  }
+
+  /**
+   * マクロ呼び出しを訪問
+   */
+  macroCallStatement(ctx: MacroCallStatementCst["children"]): MacroCallStatement {
+    const nameToken = ctx.Identifier[0];
+    if (!nameToken) {
+      throw new Error("Missing identifier in macro call");
+    }
+
+    return {
+      type: "MacroCallStatement",
+      name: nameToken.image,
+      location: this.getLocation(nameToken),
+    };
   }
 
   /**

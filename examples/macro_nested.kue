@@ -1,0 +1,18 @@
+// ネストされたマクロ呼び出しのデモ
+
+var value @ 0x180
+
+// 内部マクロ
+macro set_value {
+  value = 42
+}
+
+// 外部マクロ（内部マクロを呼び出す）
+macro init_and_output {
+  set_value!
+  output
+}
+
+// ネストされたマクロを実行
+init_and_output!
+halt

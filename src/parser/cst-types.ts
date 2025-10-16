@@ -35,6 +35,7 @@ export interface VariableDeclarationCst extends CstNode {
 export interface StatementCst extends CstNode {
   name: "statement";
   children: {
+    macroDeclaration?: MacroDeclarationCst[];
     loopStatement?: LoopStatementCst[];
     ifStatement?: IfStatementCst[];
     breakStatement?: BreakStatementCst[];
@@ -42,6 +43,7 @@ export interface StatementCst extends CstNode {
     comparisonStatement?: ComparisonStatementCst[];
     binaryOperationStatement?: BinaryOperationStatementCst[];
     assignmentStatement?: AssignmentStatementCst[];
+    macroCallStatement?: MacroCallStatementCst[];
     builtinStatement?: BuiltinStatementCst[];
   };
 }
@@ -273,5 +275,30 @@ export interface BuiltinStatementCst extends CstNode {
     Output?: IToken[];
     SetCarryFlag?: IToken[];
     ResetCarryFlag?: IToken[];
+  };
+}
+
+/**
+ * マクロ宣言のCST
+ */
+export interface MacroDeclarationCst extends CstNode {
+  name: "macroDeclaration";
+  children: {
+    Macro: IToken[];
+    Identifier: IToken[];
+    LBrace: IToken[];
+    statement?: StatementCst[];
+    RBrace: IToken[];
+  };
+}
+
+/**
+ * マクロ呼び出しのCST
+ */
+export interface MacroCallStatementCst extends CstNode {
+  name: "macroCallStatement";
+  children: {
+    Identifier: IToken[];
+    Exclamation: IToken[];
   };
 }

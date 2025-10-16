@@ -13,6 +13,8 @@ import type {
   IfStatement,
   LoopStatement,
   LValue,
+  MacroCallStatement,
+  MacroDeclaration,
   Operand,
   Program,
   RValue,
@@ -45,9 +47,11 @@ function resetLabelCounter(): void {
 export function generateCode(program: Program): string {
   const output: string[] = [];
   const symbolTable = buildSymbolTable(program.variables);
+  const macroTable = buildMacroTable(program.body);
   const context: CodeGenContext = {
     symbolTable,
     loopStack: [],
+    macroTable,
   };
 
   // ラベルカウンタをリセット
@@ -63,8 +67,12 @@ export function generateCode(program: Program): string {
     output.push("");
   }
 
-  // 各文のコードを生成
+  // 各文のコードを生成（マクロ宣言はスキップ）
   for (const statement of program.body) {
+    if (statement.type === "MacroDeclaration") {
+      // マクロ宣言はコード生成をスキップ（定義のみ）
+      continue;
+    }
     const code = generateStatement(statement, context);
     if (code) {
       output.push(code);
@@ -80,6 +88,7 @@ export function generateCode(program: Program): string {
 interface CodeGenContext {
   symbolTable: Map<string, number>;
   loopStack: LoopLabels[];
+  macroTable: Map<string, MacroDeclaration>;
 }
 
 /**
@@ -97,6 +106,19 @@ function buildSymbolTable(variables: VariableDeclaration[]): Map<string, number>
   const table = new Map<string, number>();
   for (const variable of variables) {
     table.set(variable.name, variable.address);
+  }
+  return table;
+}
+
+/**
+ * マクロテーブルを構築
+ */
+function buildMacroTable(statements: Statement[]): Map<string, MacroDeclaration> {
+  const table = new Map<string, MacroDeclaration>();
+  for (const statement of statements) {
+    if (statement.type === "MacroDeclaration") {
+      table.set(statement.name, statement);
+    }
   }
   return table;
 }
@@ -147,7 +169,10 @@ function generateStatement(statement: Statement, context: CodeGenContext): strin
     case "ContinueStatement":
       return generateContinue(context);
     case "MacroCallStatement":
+      return generateMacroCall(statement, context);
     case "MacroDeclaration":
+      // マクロ宣言はコード生成しない（定義のみ）
+      return "";
     case "AsmBlock":
       throw new Error(`Unsupported statement type: ${statement.type}`);
     default: {
@@ -808,4 +833,26 @@ function generateArrayStore(arrayAccess: ArrayAccess, symbolTable: Map<string, n
   }
   const _exhaustive: never = arrayAccess.index;
   return _exhaustive;
+}
+
+/**
+ * マクロ呼び出しのコード生成（インライン展開）
+ * identifier!  →  マクロ本体の文をインライン展開
+ */
+function generateMacroCall(statement: MacroCallStatement, context: CodeGenContext): string {
+  const macroDecl = context.macroTable.get(statement.name);
+  if (!macroDecl) {
+    throw new Error(`Undefined macro: ${statement.name}`);
+  }
+
+  // マクロ本体の各文をコード生成
+  const lines: string[] = [];
+  for (const stmt of macroDecl.body) {
+    const code = generateStatement(stmt, context);
+    if (code && code.trim() !== "") {
+      lines.push(code);
+    }
+  }
+
+  return lines.join("\n");
 }
