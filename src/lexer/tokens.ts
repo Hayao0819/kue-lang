@@ -121,6 +121,12 @@ export const DecimalLiteral = createToken({
   pattern: /[0-9]+/,
 });
 
+export const BacktickString = createToken({
+  name: "BacktickString",
+  pattern: /`[^`]*`/,
+  line_breaks: true,
+});
+
 // ========================================
 // 演算子
 // ========================================
@@ -275,6 +281,7 @@ export const allTokens = [
   Comma,
 
   // リテラルと識別子（最後に）
+  BacktickString,
   HexLiteral,
   DecimalLiteral,
   Identifier,

@@ -5,6 +5,7 @@
 
 import type {
   ArrayAccess,
+  AsmBlock,
   AssignmentStatement,
   BinaryOperationStatement,
   BuiltinStatement,
@@ -174,7 +175,7 @@ function generateStatement(statement: Statement, context: CodeGenContext): strin
       // マクロ宣言はコード生成しない（定義のみ）
       return "";
     case "AsmBlock":
-      throw new Error(`Unsupported statement type: ${statement.type}`);
+      return generateAsm(statement);
     default: {
       // TypeScriptの網羅性チェック
       const _exhaustive: never = statement;
@@ -855,4 +856,14 @@ function generateMacroCall(statement: MacroCallStatement, context: CodeGenContex
   }
 
   return lines.join("\n");
+}
+
+/**
+ * asmブロックのコード生成
+ * asm `...`  →  バッククォート内のテキストをそのまま出力
+ */
+function generateAsm(statement: AsmBlock): string {
+  // バッククォート内のテキストをそのまま返す
+  // 改行やインデントも含めて保持
+  return statement.content;
 }

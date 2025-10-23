@@ -40,6 +40,7 @@ export interface StatementCst extends CstNode {
     ifStatement?: IfStatementCst[];
     breakStatement?: BreakStatementCst[];
     continueStatement?: ContinueStatementCst[];
+    asmStatement?: AsmStatementCst[];
     comparisonStatement?: ComparisonStatementCst[];
     binaryOperationStatement?: BinaryOperationStatementCst[];
     assignmentStatement?: AssignmentStatementCst[];
@@ -300,5 +301,16 @@ export interface MacroCallStatementCst extends CstNode {
   children: {
     Identifier: IToken[];
     Exclamation: IToken[];
+  };
+}
+
+/**
+ * asm文のCST
+ */
+export interface AsmStatementCst extends CstNode {
+  name: "asmStatement";
+  children: {
+    Asm: IToken[];
+    BacktickString: IToken[];
   };
 }

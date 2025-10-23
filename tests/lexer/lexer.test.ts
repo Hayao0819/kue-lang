@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { kueLexer } from "../../src/lexer/lexer.js";
 import {
   And,
+  Asm,
   Assign,
   At,
+  BacktickString,
   Break,
   Continue,
   DecimalLiteral,
@@ -313,6 +315,41 @@ describe("KueLexer", () => {
       expect(result.tokens[0]?.startColumn).toBe(1);
       expect(result.tokens[1]?.startLine).toBe(2);
       expect(result.tokens[1]?.startColumn).toBe(1);
+    });
+  });
+
+  describe("バッククォート文字列", () => {
+    it("should tokenize single line backtick string", () => {
+      const result = kueLexer.tokenize("`LD ACC, (80H)`");
+      expect(result.errors).toHaveLength(0);
+      expect(result.tokens).toHaveLength(1);
+      expect(result.tokens[0]?.tokenType).toBe(BacktickString);
+      expect(result.tokens[0]?.image).toBe("`LD ACC, (80H)`");
+    });
+
+    it("should tokenize multiline backtick string", () => {
+      const result = kueLexer.tokenize("`LD ACC, (80H)\nADD ACC, (81H)\nST ACC, (82H)`");
+      expect(result.errors).toHaveLength(0);
+      expect(result.tokens).toHaveLength(1);
+      expect(result.tokens[0]?.tokenType).toBe(BacktickString);
+      expect(result.tokens[0]?.image).toBe("`LD ACC, (80H)\nADD ACC, (81H)\nST ACC, (82H)`");
+    });
+
+    it("should tokenize asm keyword with backtick string", () => {
+      const result = kueLexer.tokenize("asm `NOP`");
+      expect(result.errors).toHaveLength(0);
+      expect(result.tokens).toHaveLength(2);
+      expect(result.tokens[0]?.tokenType).toBe(Asm);
+      expect(result.tokens[1]?.tokenType).toBe(BacktickString);
+      expect(result.tokens[1]?.image).toBe("`NOP`");
+    });
+
+    it("should tokenize empty backtick string", () => {
+      const result = kueLexer.tokenize("``");
+      expect(result.errors).toHaveLength(0);
+      expect(result.tokens).toHaveLength(1);
+      expect(result.tokens[0]?.tokenType).toBe(BacktickString);
+      expect(result.tokens[0]?.image).toBe("``");
     });
   });
 });

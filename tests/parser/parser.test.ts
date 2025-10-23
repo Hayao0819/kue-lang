@@ -1184,4 +1184,90 @@ describe("KueParser", () => {
       expect(result.ast?.body).toHaveLength(5); // macro decl, assignment, 2 macro calls, halt
     });
   });
+
+  describe("asm文のパース", () => {
+    it("should parse single line asm statement", () => {
+      const source = "asm `NOP`";
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+      expect(result.ast?.body[0]?.type).toBe("AsmBlock");
+      if (result.ast?.body[0]?.type === "AsmBlock") {
+        expect(result.ast.body[0].content).toBe("NOP");
+      }
+    });
+
+    it("should parse multiline asm statement", () => {
+      const source = `asm \`
+    LD ACC, (80H)
+    ADD ACC, (81H)
+    ST ACC, (82H)
+\``;
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+      expect(result.ast?.body[0]?.type).toBe("AsmBlock");
+      if (result.ast?.body[0]?.type === "AsmBlock") {
+        expect(result.ast.body[0].content).toContain("LD ACC, (80H)");
+        expect(result.ast.body[0].content).toContain("ADD ACC, (81H)");
+        expect(result.ast.body[0].content).toContain("ST ACC, (82H)");
+      }
+    });
+
+    it("should parse asm with assembly comments", () => {
+      const source = `asm \`
+    ; This is an assembly comment
+    NOP
+    NOP
+\``;
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+      expect(result.ast?.body[0]?.type).toBe("AsmBlock");
+      if (result.ast?.body[0]?.type === "AsmBlock") {
+        expect(result.ast.body[0].content).toContain("; This is an assembly comment");
+      }
+    });
+
+    it("should parse multiple asm statements", () => {
+      const source = `
+        asm \`NOP\`
+        halt
+        asm \`HLT\`
+      `;
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(3);
+      expect(result.ast?.body[0]?.type).toBe("AsmBlock");
+      expect(result.ast?.body[1]?.type).toBe("BuiltinStatement");
+      expect(result.ast?.body[2]?.type).toBe("AsmBlock");
+    });
+
+    it("should parse asm in loop", () => {
+      const source = `
+        loop {
+          asm \`NOP\`
+          break
+        }
+      `;
+      const result = parse(source);
+
+      expect(result.lexerErrors).toHaveLength(0);
+      expect(result.parserErrors).toHaveLength(0);
+      expect(result.ast?.body).toHaveLength(1);
+      expect(result.ast?.body[0]?.type).toBe("LoopStatement");
+      if (result.ast?.body[0]?.type === "LoopStatement") {
+        expect(result.ast.body[0].body).toHaveLength(2);
+        expect(result.ast.body[0].body[0]?.type).toBe("AsmBlock");
+      }
+    });
+  });
 });

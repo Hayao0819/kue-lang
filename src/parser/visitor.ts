@@ -1,5 +1,6 @@
 import type { IToken } from "chevrotain";
 import type {
+  AsmBlock,
   AssignmentStatement,
   BinaryOperationStatement,
   BinaryOperator,
@@ -24,6 +25,7 @@ import type {
   VariableDeclaration,
 } from "../ast/index.js";
 import type {
+  AsmStatementCst,
   AssignmentStatementCst,
   BinaryOperationStatementCst,
   BinaryOperatorCst,
@@ -105,6 +107,9 @@ export class KueAstBuilder extends BaseCstVisitor {
     }
     if (ctx.continueStatement) {
       return this.visit(ctx.continueStatement) as ContinueStatement;
+    }
+    if (ctx.asmStatement) {
+      return this.visit(ctx.asmStatement) as AsmBlock;
     }
     if (ctx.comparisonStatement) {
       return this.visit(ctx.comparisonStatement) as ComparisonStatement;
@@ -614,6 +619,31 @@ export class KueAstBuilder extends BaseCstVisitor {
       type: "MacroCallStatement",
       name: nameToken.image,
       location: this.getLocation(nameToken),
+    };
+  }
+
+  /**
+   * asm文を訪問
+   */
+  asmStatement(ctx: AsmStatementCst["children"]): AsmBlock {
+    const asmToken = ctx.Asm[0];
+    if (!asmToken) {
+      throw new Error("Missing asm token");
+    }
+
+    const stringToken = ctx.BacktickString[0];
+    if (!stringToken) {
+      throw new Error("Missing backtick string in asm statement");
+    }
+
+    // バッククォートを除去して内容を取得
+    const raw = stringToken.image;
+    const content = raw.slice(1, -1); // 最初と最後のバッククォートを削除
+
+    return {
+      type: "AsmBlock",
+      content,
+      location: this.getLocation(asmToken),
     };
   }
 

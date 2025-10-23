@@ -2,9 +2,11 @@ import { CstParser } from "chevrotain";
 import {
   ACC,
   And,
+  Asm,
   Assign,
   At,
   allTokens,
+  BacktickString,
   Break,
   Carry,
   Continue,
@@ -98,7 +100,7 @@ export class KueParser extends CstParser {
   /**
    * 文
    *
-   * statement := macro_decl | loop | if | break | continue | comparison | binary_operation | assignment | builtin | macro_call
+   * statement := macro_decl | loop | if | break | continue | asm | comparison | binary_operation | assignment | builtin | macro_call
    *
    * Note: 各文の形式を区別するためにlookaheadを使用しています。
    */
@@ -114,6 +116,8 @@ export class KueParser extends CstParser {
       { ALT: () => this.SUBRULE(this.breakStatement) },
       // continue文
       { ALT: () => this.SUBRULE(this.continueStatement) },
+      // asm文
+      { ALT: () => this.SUBRULE(this.asmStatement) },
       {
         // 比較文: operand compare_op operand
         // 配列アクセスを考慮して比較演算子を探す
@@ -527,6 +531,16 @@ export class KueParser extends CstParser {
   private macroCallStatement = this.RULE("macroCallStatement", () => {
     this.CONSUME(Identifier);
     this.CONSUME(Exclamation);
+  });
+
+  /**
+   * asm文
+   *
+   * asm `<raw assembly code>`
+   */
+  private asmStatement = this.RULE("asmStatement", () => {
+    this.CONSUME(Asm);
+    this.CONSUME(BacktickString);
   });
 }
 

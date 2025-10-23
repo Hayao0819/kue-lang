@@ -1,0 +1,59 @@
+// ========================================
+// インラインアセンブリのサンプル
+// ========================================
+
+var counter @ 0x180
+var result @ 0x181
+
+// 基本的なasm使用例
+counter = 0
+
+// 単一行のasm
+asm `NOP`
+
+// 複数行のasm（インデント保持）
+asm `
+    * カウンターをインクリメント（直接アセンブリで記述）
+    LD ACC, (180H)
+    ADD ACC, 1
+    ST ACC, (180H)
+`
+
+// KUE-DSLとasmの混在
+counter == 5
+if NOT_ZERO {
+    // 通常のKUE-DSL文
+    result = counter + 10
+
+    // アセンブリで直接出力
+    asm `
+        ; 結果を出力
+        LD ACC, (181H)
+        OUT
+    `
+}
+
+// ループ内でのasm使用
+loop {
+    asm `
+        ; デクリメント処理
+        LD ACC, (180H)
+        SUB ACC, 1
+        ST ACC, (180H)
+    `
+
+    counter == 0
+    if ZERO {
+        break
+    }
+}
+
+// 最適化されたアセンブリコードを直接記述
+asm `
+    ; 高速なゼロクリア
+    LD ACC, 0
+    ST ACC, (180H)
+    ST ACC, (181H)
+`
+
+halt
