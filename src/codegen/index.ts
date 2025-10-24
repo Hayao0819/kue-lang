@@ -2,4 +2,4 @@
  * コード生成器のエントリーポイント
  */
 
-export * from "./codegen.js";
+export { generateCode } from "./core.js";
