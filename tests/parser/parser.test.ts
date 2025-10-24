@@ -1,4 +1,17 @@
 import { describe, expect, it } from "vitest";
+import type {
+  ArrayAccess,
+  AssignmentStatement,
+  BinaryOperationStatement,
+  BuiltinStatement,
+  ComparisonStatement,
+  IfStatement,
+  Literal,
+  LoopStatement,
+  MacroCallStatement,
+  MacroDeclaration,
+  Variable,
+} from "../../src/ast/types.js";
 import { parse } from "../../src/parser/index.js";
 
 describe("KueParser", () => {
@@ -172,10 +185,11 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("AssignmentStatement");
-      expect((stmt as any).left.type).toBe("Variable");
-      expect((stmt as any).left.name).toBe("foo");
-      expect((stmt as any).right.type).toBe("Literal");
-      expect((stmt as any).right.value).toBe(42);
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.left as Variable).type).toBe("Variable");
+      expect((assignStmt.left as Variable).name).toBe("foo");
+      expect((assignStmt.right as Literal).type).toBe("Literal");
+      expect((assignStmt.right as Literal).value).toBe(42);
     });
 
     it("should parse assignment with variable", () => {
@@ -193,9 +207,10 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("AssignmentStatement");
-      expect((stmt as any).left.name).toBe("foo");
-      expect((stmt as any).right.type).toBe("Variable");
-      expect((stmt as any).right.name).toBe("bar");
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.left as Variable).name).toBe("foo");
+      expect((assignStmt.right as Variable).type).toBe("Variable");
+      expect((assignStmt.right as Variable).name).toBe("bar");
     });
 
     it("should parse assignment with hex literal", () => {
@@ -210,8 +225,9 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).right.value).toBe(0xff);
-      expect((stmt as any).right.raw).toBe("0xFF");
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.right as Literal).value).toBe(0xff);
+      expect((assignStmt.right as Literal).raw).toBe("0xFF");
     });
 
     it("should parse multiple assignments", () => {
@@ -228,8 +244,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
       expect(result.ast?.body).toHaveLength(2);
 
-      expect((result.ast?.body[0] as any).left.name).toBe("a");
-      expect((result.ast?.body[1] as any).left.name).toBe("b");
+      expect(((result.ast?.body[0] as AssignmentStatement).left as Variable).name).toBe("a");
+      expect(((result.ast?.body[1] as AssignmentStatement).left as Variable).name).toBe("b");
     });
   });
 
@@ -243,37 +259,37 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("BuiltinStatement");
-      expect((stmt as any).instruction).toBe("halt");
+      expect((stmt as BuiltinStatement).instruction).toBe("halt");
     });
 
     it("should parse nop instruction", () => {
       const result = parse("nop");
       const stmt = result.ast?.body[0];
-      expect((stmt as any).instruction).toBe("nop");
+      expect((stmt as BuiltinStatement).instruction).toBe("nop");
     });
 
     it("should parse input instruction", () => {
       const result = parse("input");
       const stmt = result.ast?.body[0];
-      expect((stmt as any).instruction).toBe("input");
+      expect((stmt as BuiltinStatement).instruction).toBe("input");
     });
 
     it("should parse output instruction", () => {
       const result = parse("output");
       const stmt = result.ast?.body[0];
-      expect((stmt as any).instruction).toBe("output");
+      expect((stmt as BuiltinStatement).instruction).toBe("output");
     });
 
     it("should parse set_carry_flag instruction", () => {
       const result = parse("set_carry_flag");
       const stmt = result.ast?.body[0];
-      expect((stmt as any).instruction).toBe("set_carry_flag");
+      expect((stmt as BuiltinStatement).instruction).toBe("set_carry_flag");
     });
 
     it("should parse reset_carry_flag instruction", () => {
       const result = parse("reset_carry_flag");
       const stmt = result.ast?.body[0];
-      expect((stmt as any).instruction).toBe("reset_carry_flag");
+      expect((stmt as BuiltinStatement).instruction).toBe("reset_carry_flag");
     });
 
     it("should parse multiple builtin instructions", () => {
@@ -330,10 +346,11 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("BinaryOperationStatement");
-      expect((stmt as any).destination.name).toBe("result");
-      expect((stmt as any).operator).toBe("+");
-      expect((stmt as any).left.name).toBe("a");
-      expect((stmt as any).right.name).toBe("b");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect((binOpStmt.destination as Variable).name).toBe("result");
+      expect(binOpStmt.operator).toBe("+");
+      expect((binOpStmt.left as Variable).name).toBe("a");
+      expect((binOpStmt.right as Variable).name).toBe("b");
     });
 
     it("should parse arithmetic with carry", () => {
@@ -348,9 +365,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("+c");
-      expect((stmt as any).left.value).toBe(5);
-      expect((stmt as any).right.value).toBe(10);
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("+c");
+      expect((binOpStmt.left as Literal).value).toBe(5);
+      expect((binOpStmt.right as Literal).value).toBe(10);
     });
 
     it("should parse subtraction", () => {
@@ -366,9 +384,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("-");
-      expect((stmt as any).left.name).toBe("a");
-      expect((stmt as any).right.value).toBe(1);
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("-");
+      expect((binOpStmt.left as Variable).name).toBe("a");
+      expect((binOpStmt.right as Literal).value).toBe(1);
     });
 
     it("should parse subtraction with carry", () => {
@@ -383,7 +402,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("-c");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("-c");
     });
 
     it("should parse logical AND", () => {
@@ -400,7 +420,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("&");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("&");
     });
 
     it("should parse logical OR", () => {
@@ -415,9 +436,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("|");
-      expect((stmt as any).left.value).toBe(0xff);
-      expect((stmt as any).right.value).toBe(0x0f);
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("|");
+      expect((binOpStmt.left as Literal).value).toBe(0xff);
+      expect((binOpStmt.right as Literal).value).toBe(0x0f);
     });
 
     it("should parse logical XOR", () => {
@@ -433,7 +455,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("^");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("^");
     });
 
     it("should parse left shift", () => {
@@ -449,8 +472,9 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("<<");
-      expect((stmt as any).right.value).toBe(1);
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("<<");
+      expect((binOpStmt.right as Literal).value).toBe(1);
     });
 
     it("should parse arithmetic left shift", () => {
@@ -465,7 +489,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("<<a");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("<<a");
     });
 
     it("should parse right shift", () => {
@@ -480,7 +505,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe(">>");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe(">>");
     });
 
     it("should parse arithmetic right shift", () => {
@@ -496,7 +522,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe(">>a");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe(">>a");
     });
 
     it("should parse left rotate", () => {
@@ -511,7 +538,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("<<<");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe("<<<");
     });
 
     it("should parse right rotate", () => {
@@ -527,7 +555,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe(">>>");
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect(binOpStmt.operator).toBe(">>>");
     });
 
     it("should parse multiple binary operations", () => {
@@ -546,9 +575,9 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
       expect(result.ast?.body).toHaveLength(3);
 
-      expect((result.ast?.body[0] as any).operator).toBe("+");
-      expect((result.ast?.body[1] as any).operator).toBe("-");
-      expect((result.ast?.body[2] as any).operator).toBe("&");
+      expect((result.ast?.body[0] as BinaryOperationStatement).operator).toBe("+");
+      expect((result.ast?.body[1] as BinaryOperationStatement).operator).toBe("-");
+      expect((result.ast?.body[2] as BinaryOperationStatement).operator).toBe("&");
     });
   });
 
@@ -568,9 +597,10 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("ComparisonStatement");
-      expect((stmt as any).operator).toBe("==");
-      expect((stmt as any).left.name).toBe("a");
-      expect((stmt as any).right.name).toBe("b");
+      const compStmt = stmt as ComparisonStatement;
+      expect(compStmt.operator).toBe("==");
+      expect((compStmt.left as Variable).name).toBe("a");
+      expect((compStmt.right as Variable).name).toBe("b");
     });
 
     it("should parse not equals comparison", () => {
@@ -585,9 +615,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("!=");
-      expect((stmt as any).left.name).toBe("a");
-      expect((stmt as any).right.value).toBe(10);
+      const compStmt = stmt as ComparisonStatement;
+      expect(compStmt.operator).toBe("!=");
+      expect((compStmt.left as Variable).name).toBe("a");
+      expect((compStmt.right as Literal).value).toBe(10);
     });
 
     it("should parse less than comparison", () => {
@@ -603,7 +634,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("<");
+      const compStmt = stmt as ComparisonStatement;
+      expect(compStmt.operator).toBe("<");
     });
 
     it("should parse less than or equal comparison", () => {
@@ -615,9 +647,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe("<=");
-      expect((stmt as any).left.value).toBe(5);
-      expect((stmt as any).right.value).toBe(10);
+      const compStmt = stmt as ComparisonStatement;
+      expect(compStmt.operator).toBe("<=");
+      expect((compStmt.left as Literal).value).toBe(5);
+      expect((compStmt.right as Literal).value).toBe(10);
     });
 
     it("should parse greater than comparison", () => {
@@ -629,7 +662,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe(">");
+      const compStmt = stmt as ComparisonStatement;
+      expect(compStmt.operator).toBe(">");
     });
 
     it("should parse greater than or equal comparison", () => {
@@ -641,7 +675,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).operator).toBe(">=");
+      const compStmt = stmt as ComparisonStatement;
+      expect(compStmt.operator).toBe(">=");
     });
 
     it("should parse multiple comparisons", () => {
@@ -659,9 +694,9 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
       expect(result.ast?.body).toHaveLength(3);
 
-      expect((result.ast?.body[0] as any).operator).toBe("==");
-      expect((result.ast?.body[1] as any).operator).toBe("!=");
-      expect((result.ast?.body[2] as any).operator).toBe("<");
+      expect((result.ast?.body[0] as ComparisonStatement).operator).toBe("==");
+      expect((result.ast?.body[1] as ComparisonStatement).operator).toBe("!=");
+      expect((result.ast?.body[2] as ComparisonStatement).operator).toBe("<");
     });
   });
 
@@ -677,7 +712,7 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("LoopStatement");
-      expect((stmt as any).body).toHaveLength(0);
+      expect((stmt as LoopStatement).body).toHaveLength(0);
     });
 
     it("should parse loop with statements", () => {
@@ -697,9 +732,10 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("LoopStatement");
-      expect((stmt as any).body).toHaveLength(2);
-      expect((stmt as any).body[0].type).toBe("BinaryOperationStatement");
-      expect((stmt as any).body[1].type).toBe("BuiltinStatement");
+      const loopStmt = stmt as LoopStatement;
+      expect(loopStmt.body).toHaveLength(2);
+      expect(loopStmt.body[0]?.type).toBe("BinaryOperationStatement");
+      expect(loopStmt.body[1]?.type).toBe("BuiltinStatement");
     });
 
     it("should parse nested loops", () => {
@@ -719,8 +755,9 @@ describe("KueParser", () => {
 
       const outerLoop = result.ast?.body[0];
       expect(outerLoop?.type).toBe("LoopStatement");
-      expect((outerLoop as any).body).toHaveLength(1);
-      expect((outerLoop as any).body[0].type).toBe("LoopStatement");
+      const outerLoopStmt = outerLoop as LoopStatement;
+      expect(outerLoopStmt.body).toHaveLength(1);
+      expect(outerLoopStmt.body[0]?.type).toBe("LoopStatement");
     });
   });
 
@@ -740,8 +777,9 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("IfStatement");
-      expect((stmt as any).condition).toBe("ZERO");
-      expect((stmt as any).body).toHaveLength(1);
+      const ifStmt = stmt as IfStatement;
+      expect(ifStmt.condition).toBe("ZERO");
+      expect(ifStmt.body).toHaveLength(1);
     });
 
     it("should parse if with NOT_ZERO condition", () => {
@@ -753,7 +791,7 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).condition).toBe("NOT_ZERO");
+      expect((stmt as IfStatement).condition).toBe("NOT_ZERO");
     });
 
     it("should parse if with NEGATIVE condition", () => {
@@ -765,7 +803,7 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).condition).toBe("NEGATIVE");
+      expect((stmt as IfStatement).condition).toBe("NEGATIVE");
     });
 
     it("should parse if with CARRY condition", () => {
@@ -777,7 +815,7 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).condition).toBe("CARRY");
+      expect((stmt as IfStatement).condition).toBe("CARRY");
     });
 
     it("should parse if with complex body", () => {
@@ -797,7 +835,7 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("IfStatement");
-      expect((stmt as any).body).toHaveLength(3);
+      expect((stmt as IfStatement).body).toHaveLength(3);
     });
 
     it("should parse nested if statements", () => {
@@ -816,7 +854,7 @@ describe("KueParser", () => {
 
       const outerIf = result.ast?.body[0];
       expect(outerIf?.type).toBe("IfStatement");
-      expect((outerIf as any).body[0].type).toBe("IfStatement");
+      expect((outerIf as IfStatement).body[0]?.type).toBe("IfStatement");
     });
   });
 
@@ -834,7 +872,7 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const loop = result.ast?.body[0];
-      expect((loop as any).body[0].type).toBe("BreakStatement");
+      expect((loop as LoopStatement).body[0]?.type).toBe("BreakStatement");
     });
 
     it("should parse continue statement", () => {
@@ -850,7 +888,7 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const loop = result.ast?.body[0];
-      expect((loop as any).body[0].type).toBe("ContinueStatement");
+      expect((loop as LoopStatement).body[0]?.type).toBe("ContinueStatement");
     });
 
     it("should parse loop with break and continue", () => {
@@ -874,9 +912,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const loop = result.ast?.body[0];
-      expect((loop as any).body).toHaveLength(4);
-      expect((loop as any).body[1].body[0].type).toBe("BreakStatement");
-      expect((loop as any).body[2].body[0].type).toBe("ContinueStatement");
+      const loopStmt = loop as LoopStatement;
+      expect(loopStmt.body).toHaveLength(4);
+      expect((loopStmt.body[1] as IfStatement).body[0]?.type).toBe("BreakStatement");
+      expect((loopStmt.body[2] as IfStatement).body[0]?.type).toBe("ContinueStatement");
     });
   });
 
@@ -927,12 +966,13 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("AssignmentStatement");
-      expect((stmt as any).left.type).toBe("Variable");
-      expect((stmt as any).left.name).toBe("result");
-      expect((stmt as any).right.type).toBe("ArrayAccess");
-      expect((stmt as any).right.array).toBe("arr");
-      expect((stmt as any).right.index.type).toBe("Literal");
-      expect((stmt as any).right.index.value).toBe(5);
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.left as Variable).type).toBe("Variable");
+      expect((assignStmt.left as Variable).name).toBe("result");
+      expect((assignStmt.right as ArrayAccess).type).toBe("ArrayAccess");
+      expect((assignStmt.right as ArrayAccess).array).toBe("arr");
+      expect(((assignStmt.right as ArrayAccess).index as Literal).type).toBe("Literal");
+      expect(((assignStmt.right as ArrayAccess).index as Literal).value).toBe(5);
     });
 
     it("should parse array access with variable index in assignment (right)", () => {
@@ -949,10 +989,11 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).right.type).toBe("ArrayAccess");
-      expect((stmt as any).right.array).toBe("arr");
-      expect((stmt as any).right.index.type).toBe("Variable");
-      expect((stmt as any).right.index.name).toBe("i");
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.right as ArrayAccess).type).toBe("ArrayAccess");
+      expect((assignStmt.right as ArrayAccess).array).toBe("arr");
+      expect(((assignStmt.right as ArrayAccess).index as Variable).type).toBe("Variable");
+      expect(((assignStmt.right as ArrayAccess).index as Variable).name).toBe("i");
     });
 
     it("should parse array access with constant index in assignment (left)", () => {
@@ -969,10 +1010,11 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("AssignmentStatement");
-      expect((stmt as any).left.type).toBe("ArrayAccess");
-      expect((stmt as any).left.array).toBe("arr");
-      expect((stmt as any).left.index.value).toBe(3);
-      expect((stmt as any).right.type).toBe("Variable");
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.left as ArrayAccess).type).toBe("ArrayAccess");
+      expect((assignStmt.left as ArrayAccess).array).toBe("arr");
+      expect(((assignStmt.left as ArrayAccess).index as Literal).value).toBe(3);
+      expect((assignStmt.right as Variable).type).toBe("Variable");
     });
 
     it("should parse array access with variable index in assignment (left)", () => {
@@ -989,9 +1031,10 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).left.type).toBe("ArrayAccess");
-      expect((stmt as any).left.index.type).toBe("Variable");
-      expect((stmt as any).left.index.name).toBe("i");
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.left as ArrayAccess).type).toBe("ArrayAccess");
+      expect(((assignStmt.left as ArrayAccess).index as Variable).type).toBe("Variable");
+      expect(((assignStmt.left as ArrayAccess).index as Variable).name).toBe("i");
     });
 
     it("should parse array access on both sides of assignment", () => {
@@ -1009,10 +1052,11 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).left.type).toBe("ArrayAccess");
-      expect((stmt as any).left.array).toBe("dst");
-      expect((stmt as any).right.type).toBe("ArrayAccess");
-      expect((stmt as any).right.array).toBe("src");
+      const assignStmt = stmt as AssignmentStatement;
+      expect((assignStmt.left as ArrayAccess).type).toBe("ArrayAccess");
+      expect((assignStmt.left as ArrayAccess).array).toBe("dst");
+      expect((assignStmt.right as ArrayAccess).type).toBe("ArrayAccess");
+      expect((assignStmt.right as ArrayAccess).array).toBe("src");
     });
 
     it("should parse array access in binary operation (right operand)", () => {
@@ -1029,9 +1073,10 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("BinaryOperationStatement");
-      expect((stmt as any).left.type).toBe("ArrayAccess");
-      expect((stmt as any).left.array).toBe("arr");
-      expect((stmt as any).right.value).toBe(10);
+      const binOpStmt = stmt as BinaryOperationStatement;
+      expect((binOpStmt.left as ArrayAccess).type).toBe("ArrayAccess");
+      expect((binOpStmt.left as ArrayAccess).array).toBe("arr");
+      expect((binOpStmt.right as Literal).value).toBe(10);
     });
 
     it("should parse array access in comparison", () => {
@@ -1048,8 +1093,9 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("ComparisonStatement");
-      expect((stmt as any).left.type).toBe("ArrayAccess");
-      expect((stmt as any).left.array).toBe("arr");
+      const compStmt = stmt as ComparisonStatement;
+      expect((compStmt.left as ArrayAccess).type).toBe("ArrayAccess");
+      expect((compStmt.left as ArrayAccess).array).toBe("arr");
     });
 
     it("should parse array access with hex literal index", () => {
@@ -1065,7 +1111,8 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).right.index.value).toBe(0x0a);
+      const assignStmt = stmt as AssignmentStatement;
+      expect(((assignStmt.right as ArrayAccess).index as Literal).value).toBe(0x0a);
     });
   });
 
@@ -1085,9 +1132,10 @@ describe("KueParser", () => {
 
       const stmt = result.ast?.body[0];
       expect(stmt?.type).toBe("MacroDeclaration");
-      expect((stmt as any).name).toBe("init");
-      expect((stmt as any).body).toHaveLength(1);
-      expect((stmt as any).body[0].type).toBe("BuiltinStatement");
+      const macroStmt = stmt as MacroDeclaration;
+      expect(macroStmt.name).toBe("init");
+      expect(macroStmt.body).toHaveLength(1);
+      expect(macroStmt.body[0]?.type).toBe("BuiltinStatement");
     });
 
     it("should parse empty macro", () => {
@@ -1099,8 +1147,9 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).name).toBe("empty");
-      expect((stmt as any).body).toHaveLength(0);
+      const macroStmt = stmt as MacroDeclaration;
+      expect(macroStmt.name).toBe("empty");
+      expect(macroStmt.body).toHaveLength(0);
     });
 
     it("should parse macro with multiple statements", () => {
@@ -1119,7 +1168,7 @@ describe("KueParser", () => {
       expect(result.parserErrors).toHaveLength(0);
 
       const stmt = result.ast?.body[0];
-      expect((stmt as any).body).toHaveLength(3);
+      expect((stmt as MacroDeclaration).body).toHaveLength(3);
     });
 
     it("should parse macro call", () => {
@@ -1138,7 +1187,7 @@ describe("KueParser", () => {
 
       const macroCall = result.ast?.body[1];
       expect(macroCall?.type).toBe("MacroCallStatement");
-      expect((macroCall as any).name).toBe("test");
+      expect((macroCall as MacroCallStatement).name).toBe("test");
     });
 
     it("should parse nested macro calls", () => {
@@ -1159,7 +1208,7 @@ describe("KueParser", () => {
       expect(result.ast?.body).toHaveLength(3);
 
       const outerMacro = result.ast?.body[1];
-      expect((outerMacro as any).body[0].type).toBe("MacroCallStatement");
+      expect(((outerMacro as MacroDeclaration).body[0] as MacroCallStatement).type).toBe("MacroCallStatement");
     });
 
     it("should parse program with macros and regular statements", () => {
