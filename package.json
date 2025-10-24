@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
-    "test": "vitest",
+    "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
     "lint": "biome lint src",
@@ -34,6 +34,7 @@
     "@biomejs/biome": "2.2.6",
     "@types/node": "^20.10.0",
     "@vitest/coverage-v8": "^1.0.4",
+    "markdownlint-cli": "^0.45.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^1.0.4"
