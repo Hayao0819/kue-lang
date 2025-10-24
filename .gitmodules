@@ -1,0 +1,3 @@
+[submodule "src/external/kemuide"]
+	path = src/external/kemuide
+	url = https://github.com/OpenWaseda/kemuide.git
